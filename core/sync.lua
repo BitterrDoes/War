@@ -253,7 +253,6 @@ function WAR.SYNC.tick()
             local key = m.key
             if key then
                 WAR.AVATAR.grant_local(key)
-                if WAR.UI.tell then WAR.UI.tell(WAR.AVATAR.name(key) .. " icon unlocked", G.C.PURPLE) end
             end
 
         elseif a == "counters" then

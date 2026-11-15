@@ -111,7 +111,7 @@ return {
             war_icon_hit_the_road     = { name = "Hit the Road", text = { "Discard 50 Jacks in a single match" } },
             war_icon_supernova        = { name = "Supernova", text = { "Play a single hand type 25 times in one match" } }, -- so 25 pairs, 25 flushes whatever
             war_icon_anaglyph_deck    = { name = "Anaglyph Deck", text = { "Play 10 matches on the Anaglyph deck" } },
-            war_icon_black_hole       = { name = "Black Hole", text = { "Use the Black Hole spectral in a game" } },
+            war_icon_black_hole       = { name = "Black Hole", text = { "Use the Black Hole in a game" } },
             war_icon_canio            = { name = "Canio", text = { "Win a game with Canio" } },
             war_icon_chicot           = { name = "Chicot", text = { "Win a game with Chicot" } },
             war_icon_perkeo           = { name = "Perkeo", text = { "Win a game with Perkeo" } },
@@ -171,7 +171,7 @@ return {
             war_gm_vanilla_desc   = {
                 "Standard PvP Balatro.",
                 "Boss blinds become PvP rounds",
-                "starting from Ante 2.",
+                "starting from Ante 3.",
                 "Score fewer chips to lose a life.",
             },
 
@@ -181,7 +181,10 @@ return {
 
             -- Ruleset: Mini World
             war_rs_weeworld_name   = "Wee World",
-            war_rs_weeworld_desc   = {"Removes majority of all", "Jokers, Consumables, Booster Packs and Vouchers."},
+            war_rs_weeworld_desc   = {
+                "Removes majority of all",
+                "Jokers, Consumables, Booster Packs and Tags"
+            },
 
             -- Lobby bar buttons
             war_ready                 = "READY",

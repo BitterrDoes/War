@@ -7,7 +7,8 @@ WAR.AUTH = {
     token    = nil,
     state    = "idle", -- idle | connecting | registering | logging_in | logged_in | guest
     on_done  = nil,   -- callback(ok, err)
-    newly_logged_in = false -- used to tell whether logging in is from previously existing session or not
+    newly_logged_in = false, -- used to tell whether logging in is from previously existing session or not
+    stats    = { wins = "-", losses = "-", win_percent = "-%"  },
 }
 
 local SESSION_FILE = "War_session.dat"

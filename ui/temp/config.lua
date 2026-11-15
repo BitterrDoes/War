@@ -1,6 +1,11 @@
 SMODS.Mods["War"].config_tab = function()
     -- Rebuilding the config tab;
 
+    -- Request a fresh stats fetch whenever the tab is opened.
+    if WAR.AUTH.state == "logged_in" and WAR.NET.connected() then
+        WAR.NET.send({ action = "stats", username = WAR.AUTH.user })
+    end
+
     -- Container for all UI on this page;
     -- Additions to this will be created separately to improve readability
     local ui_definition = {
@@ -46,7 +51,7 @@ SMODS.Mods["War"].config_tab = function()
                 nodes = {
                     {
                         n = G.UIT.T,
-                        config = { text = "N/A", scale = 0.5, colour = G.C.CHIPS, shadow = true }
+                        config = { ref_table = WAR.AUTH.stats, ref_value = "wins", scale = 0.5, colour = G.C.CHIPS, shadow = true }
                     }
                 }
             }
@@ -76,7 +81,7 @@ SMODS.Mods["War"].config_tab = function()
                 nodes = {
                     {
                         n = G.UIT.T,
-                        config = { text = "N/A", scale = 0.5, colour = G.C.MULT, shadow = true }
+                        config = { ref_table = WAR.AUTH.stats, ref_value = "losses", scale = 0.5, colour = G.C.MULT, shadow = true }
                     }
                 }
             }
@@ -106,7 +111,7 @@ SMODS.Mods["War"].config_tab = function()
                 nodes = {
                     {
                         n = G.UIT.T,
-                        config = { text = "67%", scale = 0.5, colour = G.C.PURPLE, shadow = true }
+                        config = { ref_table = WAR.AUTH.stats, ref_value = "win_percent", scale = 0.5, colour = G.C.PURPLE, shadow = true }
                     }
                 }
             }
@@ -207,4 +212,13 @@ SMODS.Mods["War"].config_tab = function()
     --             colour=G.C.GREEN, minw=5 }),
     --     },
     -- }
+end
+
+function WAR.UI.on_stats(m)
+    local w = tonumber(m.wins)   or 0
+    local p = tonumber(m.played) or 0
+    local l = p - w
+    WAR.AUTH.stats.wins        = tostring(w)
+    WAR.AUTH.stats.losses      = tostring(l)
+    WAR.AUTH.stats.win_percent = p > 0 and (math.floor(w / p * 100) .. "%") or "-%"
 end

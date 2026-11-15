@@ -913,6 +913,23 @@ async def handle_resume_timer(lobby, role, msg):
 async def handle_ready_blind(lobby, role, msg):
     lobby[f'{role}_ready_blind'] = True
 
+    # Pick up any skips that happened on the blind immediately before this one
+    # (e.g. skipping the Big blind) where no playHand was sent.
+    # Only process when the field is present — absent means the client didn't
+    # have new skip data, and we must not reset _skips_seen to 0.
+    raw_skips = msg.get('skips')
+    if raw_skips is not None:
+        try:
+            new_skips = int(raw_skips)
+        except (TypeError, ValueError):
+            new_skips = None
+        if new_skips is not None:
+            seen = int(lobby.get(f'_{role}_skips_seen', 0) or 0)
+            if new_skips > seen:
+                lobby['_skip_timer_bonus'] = int(lobby.get('_skip_timer_bonus', 0) or 0) + (new_skips - seen)
+            lobby[f'_{role}_skips_seen'] = new_skips
+            lobby[f'{role}_skips'] = new_skips
+
     # Speedrun: first player to ready
     if not lobby['host_first_ready'] and not lobby['guest_first_ready']:
         lobby[f'{role}_first_ready'] = True
@@ -923,6 +940,7 @@ async def handle_ready_blind(lobby, role, msg):
         task = lobby.pop('_blind_timer_task', None)
         if task and not task.done():
             task.cancel()
+        lobby['_skip_timer_bonus'] = 0  # no timer needed; don't carry skip bonus into next blind
         await _broadcast_blind_timer(lobby, 0)
         await _fire_start_blind(lobby)
     else:

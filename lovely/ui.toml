@@ -13,11 +13,11 @@ pattern      = "self.children.animatedSprite.states = self.states"
 position     = "before"
 match_indent = true
 payload      = """
+if self.children.main_blind_icon then
+    self.children.main_blind_icon:remove()
+    self.children.main_blind_icon = nil
+end
 if WAR.is_pvp_blind() then
-    if self.children.main_blind_icon then
-        self.children.main_blind_icon:remove()
-        self.children.main_blind_icon = nil
-    end
     local atlas_key, row = WAR.UI.rival_icon_row()
     local pos = { x = 0, y = row }
     self.children.animatedSprite = SMODS.create_sprite(self.T.x, self.T.y, self.T.w, self.T.h, atlas_key, pos)

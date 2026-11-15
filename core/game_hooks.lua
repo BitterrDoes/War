@@ -637,7 +637,7 @@ G.FUNCS.select_blind = function(e)
         local blind  = e and e.config and e.config.ref_table
         if blind and WAR.is_rival_blind(blind) then
             WAR.GAME._pending_blind_e = e
-            WAR.NET.send({ action = "readyBlind" })
+            WAR.NET.send({ action = "readyBlind", skips = (G.GAME and G.GAME.skips) or 0 })
             WAR.UI.show_waiting(localize('war_pvp_waiting'))
             return
         end
