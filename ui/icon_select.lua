@@ -14,6 +14,72 @@ local function _icon_spr(atlas_key, row)
     return spr
 end
 
+-- Cells that have been wired with hover popups, kept so clear_icon_tips can
+-- reach them when the screen is closed from outside hover.
+local _wired = {}
+
+WAR.UI.clear_icon_tips = function()
+    for _, cell in ipairs(_wired) do
+        for _, k in ipairs({ '_war_name_popup', '_war_cond_popup' }) do
+            if cell[k] then
+                pcall(function() cell[k]:remove() end)
+                cell[k] = nil
+            end
+        end
+    end
+    _wired = {}
+end
+
+-- Mirrors Node:hover()'s h_popup pattern exactly, but with two entries stored
+-- as plain fields (_war_name_popup / _war_cond_popup) instead of cell.children.
+-- Using cell.children would cause UIElement:draw_children() to draw them during
+-- the overlay pass and set UIBox.FRAME.DRAW, so the G.I.POPUP pass would skip
+-- them (the per-frame draw guard). Plain fields bypass draw_children entirely;
+-- the boxes draw once, in the POPUP pass, on top of the overlay.
+local function _wire_ach_hovers()
+    if not G.OVERLAY_MENU or not G.OVERLAY_MENU.get_UIE_by_ID then return end
+    for _, icon in ipairs(WAR.AVATAR.by_kind("achievement")) do
+        local cell = G.OVERLAY_MENU:get_UIE_by_ID("war_icon_cell_" .. icon.key)
+        if cell and not cell._war_tips then
+            cell._war_tips = true
+            _wired[#_wired + 1] = cell
+
+            local base_hover = cell.hover
+            local base_stop  = cell.stop_hover
+
+            cell.hover = function(self)
+                if base_hover then base_hover(self) end
+                if not self._war_name_popup then
+                    self._war_name_popup = UIBox{
+                        definition = create_popup_UIBox_tooltip({ title = WAR.AVATAR.name(icon.key) }),
+                        config = { align='tm', offset={x=0, y=-0.1}, parent=self,
+                                   instance_type='POPUP', bond='Glued' },
+                    }
+                    self._war_name_popup.states.collide.can = false
+                end
+                if not self._war_cond_popup then
+                    self._war_cond_popup = UIBox{
+                        definition = create_popup_UIBox_tooltip({ title = WAR.AVATAR.describe(icon.key) }),
+                        config = { align='bm', offset={x=0, y=0.1}, parent=self,
+                                   instance_type='POPUP', bond='Glued' },
+                    }
+                    self._war_cond_popup.states.collide.can = false
+                end
+            end
+
+            cell.stop_hover = function(self)
+                for _, k in ipairs({ '_war_name_popup', '_war_cond_popup' }) do
+                    if self[k] then
+                        self[k]:remove()
+                        self[k] = nil
+                    end
+                end
+                if base_stop then base_stop(self) end
+            end
+        end
+    end
+end
+
 local function icon_cell(icon, selected)
     local entitled = WAR.AVATAR.is_entitled(icon.key)
 
@@ -27,7 +93,7 @@ local function icon_cell(icon, selected)
             align   = "cm", r=0.08, padding=0.06,
             colour  = { 0, 0, 0, 0 },
             hover   = true,
-            tooltip = { title = localize{ key = "war_icon_" .. icon.key, set = 'WAR_Icon', type = 'raw_descriptions' }[1] or icon.key },
+            can_collide = true,
         }, nodes={ inner }}
     end
 
@@ -43,7 +109,8 @@ local function icon_cell(icon, selected)
         emboss    = selected and 0.08 or nil,
         hover     = true,
         button    = "war_select_icon",
-        tooltip = { title = localize{ key = "war_icon_" .. icon.key, set = 'WAR_Icon', type = 'name_text' } or icon.key },
+        tooltip   = (not icon.achieve) and { title = WAR.AVATAR.name(icon.key) } or nil,
+        can_collide = icon.achieve or nil,
         ref_table = { icon_key = icon.key },
         ref_value = "icon_key",
     }, nodes={ inner }}
@@ -111,14 +178,28 @@ function G.UIDEF.war_icon_select()
     })
 end
 
+-- Vanilla builds a tab's contents only when it is selected, so the wiring has to
+-- run again on every tab change as well as on open.
+local _base_change_tab = G.FUNCS.change_tab
+if _base_change_tab then
+    G.FUNCS.change_tab = function(e)
+        _base_change_tab(e)
+        WAR.UI.clear_icon_tips()
+        _wire_ach_hovers()
+    end
+end
+
 G.FUNCS.war_open_icon_select = function(e)
+    WAR.UI.clear_icon_tips()
     WAR.UI.open_instant(G.UIDEF.war_icon_select())
+    _wire_ach_hovers()
 end
 
 G.FUNCS.war_select_icon = function(e)
     local key = e.config.ref_table and e.config.ref_table.icon_key
     if not key then return end
     if not WAR.AVATAR.is_entitled(key) then return end
+    WAR.UI.clear_icon_tips()
     WAR.AVATAR.save_choice(key)
 
     local repainted = false
@@ -131,7 +212,10 @@ G.FUNCS.war_select_icon = function(e)
             repainted = true
         end
     end
-    if not repainted then WAR.UI.open_instant(G.UIDEF.war_icon_select()) end
+    if not repainted then
+        WAR.UI.open_instant(G.UIDEF.war_icon_select())
+        _wire_ach_hovers()
+    end
 end
 
-print("[WAR] ui/icon_select loaded")
+WAR.log("[WAR] ui/icon_select loaded")

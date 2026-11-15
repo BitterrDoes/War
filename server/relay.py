@@ -28,12 +28,14 @@ FREE_ICONS = {
     'raised_fist', 'popcorn', 'gift_card', 'stamp', 'superposition',
     'fibonacci', 'scholar', 'ride_the_bus', 'pareidolia', 'brutalists_heart',
     'chud', 'sob', 'tasque_manager',
+    'mizzle', 'ironclad', 'rodeo_abandoned_by_god', 'three_cheers_one', 'three_cheers_two',
 }
 
 SPECIAL_ICONS = {
     'bean', 'zaino', 'doc', 'murphy', 'thunderedge', 'soulware',
     'sheila', 'astra', 'lizie', 'inky', 'revo', 'argel', 'baggute',
-    'amolyte', 'gabby',
+    'amolyte', 'gabby', 'willow',
+    'george_the_rat', 'fir', 'belenos_bear', 'vagabond',
 }
 
 def _ach(threshold=None, stat=None, reserved=False):
@@ -61,7 +63,7 @@ ACHIEVEMENTS = {
     'oneshot':       _ach(threshold=100),
     'egg':           _ach(),
     'bloodstone':    _ach(threshold=100),
-    'pizza':         _ach(threshold=100),
+    'pizza':         _ach(threshold=250),
     'riff_raff':     _ach(),
     'garygpt':       _ach(),
     'missing_joker': _ach(),
@@ -94,10 +96,18 @@ ACHIEVEMENTS = {
     'blue_seal':     _ach(threshold=100),
     'gold_seal':     _ach(threshold=100),
     'purple_seal':   _ach(threshold=100),
-    'eyes':          _ach(reserved=True),
-    'hack':          _ach(reserved=True),
-    'hit_the_road':  _ach(reserved=True),
-    'supernova':     _ach(reserved=True),
+    'eyes':          _ach(),
+    'hack':          _ach(),
+    'hit_the_road':  _ach(),
+    'supernova':     _ach(),
+    'anaglyph_deck': _ach(threshold=10),
+    'black_hole':    _ach(),
+    'canio':         _ach(),
+    'chicot':        _ach(),
+    'perkeo':        _ach(),
+    'tribuolet':     _ach(),
+    'yorick':        _ach(),
+    'windows_7':     _ach(),
 }
 
 # Stake keys that must all be earned to auto-grant jimbo_stake.
@@ -125,6 +135,28 @@ def get_user_entitlements(username):
         return []
     rows = db.execute("SELECT key FROM user_entitlements WHERE user_id=?", (row['id'],)).fetchall()
     return [r['key'] for r in rows]
+
+def get_achievement_progress(username):
+    """key -> how far the account is towards each counted achievement.
+
+    Threshold achievements (the ones the client increments) read their counter
+    row; stat achievements are derived from game_results. Keys the account has
+    not started report 0 so the client can show the target regardless.
+    """
+    row = db.execute("SELECT id FROM users WHERE username=? COLLATE NOCASE", (username,)).fetchone()
+    if not row:
+        return {}
+    uid = row['id']
+    out = {key: 0 for key in ACHIEVEMENT_THRESHOLDS}
+    for r in db.execute("SELECT key, count FROM achievement_counters WHERE user_id=?", (uid,)):
+        if r['key'] in out:
+            out[r['key']] = r['count']
+    for key, defn in ACHIEVEMENTS.items():
+        if defn['stat']:
+            statname, _target = defn['stat']
+            got = db.execute(STAT_QUERIES[statname], (uid,)).fetchone()[0]
+            out[key] = got
+    return out
 
 def validate_icon(username, icon_key):
     if not icon_key or icon_key == 'default':
@@ -388,6 +420,9 @@ def new_game_state():
         'guest_ante':              1,
         'host_skips':              0,
         'guest_skips':             0,
+        '_host_skips_seen':        0,
+        '_guest_skips_seen':       0,
+        '_skip_timer_bonus':       0,
         '_in_pvp_blind':           False,
         '_first_ready_at':         None,
         '_host_best':              0.0,
@@ -491,7 +526,8 @@ async def handle_login(writer, msg):
     entitlements = get_user_entitlements(username)
     clients[writer]['_sent_entitlements'] = set(entitlements)
     await send(writer, {'action': 'logged_in', 'token': token, 'username': username,
-                        'avatar': avatar, 'entitlements': entitlements})
+                        'avatar': avatar, 'entitlements': entitlements,
+                        'counters': get_achievement_progress(username)})
 
 async def handle_token_login(writer, msg):
     token = msg.get('token')
@@ -511,7 +547,8 @@ async def handle_token_login(writer, msg):
     entitlements = get_user_entitlements(row['username'])
     clients[writer]['_sent_entitlements'] = set(entitlements)
     await send(writer, {'action': 'logged_in', 'username': row['username'],
-                        'avatar': avatar, 'entitlements': entitlements})
+                        'avatar': avatar, 'entitlements': entitlements,
+                        'counters': get_achievement_progress(row['username'])})
 
 async def handle_logout(writer, msg):
     token = msg.get('token')
@@ -892,6 +929,12 @@ async def handle_ready_blind(lobby, role, msg):
         # One player ready: start timer if configured
         enemy_role = get_enemy_role(role)
         timer_secs = int(lobby['options'].get('timer_seconds', 0) or 0)
+        # Skips only buy time once. The clock is stretched for the skips logged
+        # since the last blind that got a bonus, then the credit is spent, so a
+        # match with six skips behind it doesn't hand out a huge clock forever.
+        pending = int(lobby.get('_skip_timer_bonus', 0) or 0)
+        timer_secs = timer_secs + pending * int(timer_secs / 2)
+        lobby['_skip_timer_bonus'] = 0
         if timer_secs > 0:
             old = lobby.pop('_blind_timer_task', None)
             if old and not old.done():
@@ -916,9 +959,17 @@ async def handle_play_hand(lobby, role, msg):
     score_str  = str(msg.get('score', '0'))
     hands_left = int(msg.get('handsLeft', 0))
     try:
-        lobby[f'{role}_skips'] = int(msg.get('skips', 0) or 0)
+        new_skips = int(msg.get('skips', 0) or 0)
     except (TypeError, ValueError):
-        pass
+        new_skips = None
+    if new_skips is not None:
+        # The client sends G.GAME.skips, a run total. Only the increase since
+        # the last hand played is a fresh skip worth extra clock.
+        seen = int(lobby.get(f'_{role}_skips_seen', 0) or 0)
+        if new_skips > seen:
+            lobby['_skip_timer_bonus'] = int(lobby.get('_skip_timer_bonus', 0) or 0) + (new_skips - seen)
+        lobby[f'_{role}_skips_seen'] = new_skips
+        lobby[f'{role}_skips'] = new_skips
 
     score = parse_score(score_str)
     lobby[f'{role}_score'] = score
@@ -1076,7 +1127,10 @@ async def check_jimbo_stake(writer, username):
 async def handle_claim_achievement(writer, msg):
     key = msg.get('key', '')
     defn = ACHIEVEMENTS.get(key)
-    if not defn or defn['reserved']:
+    # Only the one-off unlocks are claimable. Counted and stat achievements move
+    # through incrementAchievement / game_results, so a claim for one of those
+    # would skip the progress it is meant to measure.
+    if not defn or defn['reserved'] or defn['threshold'] or defn['stat']:
         return
     username = clients.get(writer, {}).get('username')
     if not username:
@@ -1098,11 +1152,14 @@ async def handle_increment_achievement(writer, msg):
     ).fetchone()
     if not row:
         return
-    if increment_achievement_counter(row['id'], key, amount):
+    reached = increment_achievement_counter(row['id'], key, amount)
+    if reached:
         if grant_achievement(username, key):
             await send(writer, {'action': 'achievementUnlocked', 'key': ACHIEVEMENT_ICONS[key]})
         if key in VANILLA_STAKE_KEYS:
             await check_jimbo_stake(writer, username)
+    # The icon tooltips show lifetime progress, so refresh it after every move.
+    await send(writer, {'action': 'counters', 'counters': get_achievement_progress(username)})
 
 async def handle_fail_round(lobby, role, msg):
     if not lobby['options'].get('death_on_round_loss', True):

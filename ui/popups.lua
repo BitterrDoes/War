@@ -99,8 +99,9 @@ function G.FUNCS.war_dismiss_end_pvp(e)
 end
 
 -- Non-blocking: the lives counter changes, but a bare number change is easy
--- to miss mid-round. Uses the same two sounds vanilla plays when a run ends.
-function WAR.UI.tell(text, colour)
+-- to miss mid-round. Uses the same two sounds vanilla plays when a run ends,
+-- unless the caller supplies its own cue (silent).
+function WAR.UI.tell(text, colour, silent)
     if not G.play then return end
     attention_text({
         scale  = 0.75,
@@ -112,6 +113,7 @@ function WAR.UI.tell(text, colour)
         colour = colour or G.C.RED,
         major  = G.play,
     })
+    if silent then return end
     play_sound("negative", 0.5, 0.7)
     play_sound("whoosh2", 0.9, 0.7)
 end
@@ -402,4 +404,4 @@ function G.FUNCS.war_dismiss_message(e)
     G.FUNCS.exit_overlay_menu()
 end
 
-print("[WAR] ui/popups loaded")
+WAR.log("[WAR] ui/popups loaded")

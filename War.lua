@@ -41,12 +41,21 @@ WAR.load("core/avatar.lua")
 WAR.load("core/sync.lua")
 WAR.load("core/game_hooks.lua")
 
+-- One line per boot so logs can be matched to a build.
+WAR.log(string.format("[WAR] v%s loaded", WAR.mod_version()))
+
 -- Load saved pfp choice once all modules are initialised.
 if WAR.AVATAR then WAR.AVATAR.load_choice() end
 
 WAR.load_dir("objects/blinds")
 WAR.load_dir("gamemodes")
 WAR.load_dir("rulesets")
+
+-- Custom cues. SMODS resolves `path` under the mod's assets/sounds/, and this
+-- Steamodded version does not scan that folder by itself, so each file is
+-- registered explicitly under the code the mod plays.
+SMODS.Sound { key = "war_timer",    path = "war_timer.ogg",    pitch = 1, volume = 1 }
+SMODS.Sound { key = "war_opp_lost", path = "war_opp_lost.ogg", pitch = 1, volume = 1 }
 
 -- UI: explicit order (lobby last; it references symbols from earlier files)
 WAR.load("ui/_init.lua")

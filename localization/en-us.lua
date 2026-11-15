@@ -56,32 +56,35 @@ return {
             war_icon_chud             = { name = "Chud" },
             war_icon_sob              = { name = "Sob" },
             war_icon_tasque_manager   = { name = "Tasque Manager" },
-            war_icon_hack             = { name = "Hack" },
-            war_icon_hit_the_road     = { name = "Hit the Road" },
+            war_icon_mizzle           = { name = "Mizzle" },
+            war_icon_ironclad         = { name = "Ironclad" },
+            war_icon_rodeo_abandoned_by_god = { name = "Rodeo Abandoned by God" },
+            war_icon_three_cheers_one = { name = "Three Cheers (One)" },
+            war_icon_three_cheers_two = { name = "Three Cheers (Two)" },
 
             -- Achievement
-            war_icon_jolly            = { name = "Jolly", text = { "Win a game playing only hands that contain a pair" } },
+            war_icon_jolly            = { name = "Jolly", text = { "Win a game playing only hands that contain a pair" } }, -- in vanilla this is Pair, Two Pair, Three of a Kind, Full House, Four of a Kind, Five of a Kind, Flush House, Flush Five and sometimes Flush
             war_icon_oops             = { name = "Oops", text = { "Have 25 probability rolls land in one game" } },
-            war_icon_droll            = { name = "Droll", text = { "Win a game playing only hands that contain a flush" } },
+            war_icon_droll            = { name = "Droll", text = { "Win a game playing only hands that contain a flush" } }, -- in vanilla this is Flush, Straight Flush, Flush House and Flush Five
             war_icon_meta             = { name = "Meta", text = { "Play 100 matches" } },
             war_icon_brilliant        = { name = "Brilliant", text = { "Win 10 games" } },
             war_icon_blunder          = { name = "Blunder", text = { "Lose 10 games" } },
             war_icon_the_soul         = { name = "The Soul", text = { "Use The Soul in a game" } },
-            war_icon_oneshot          = { name = "OneShot", text = { "Use The Sun 100 times" } },
-            war_icon_egg              = { name = "Egg", text = { "Sell a joker worth $15 or more" } },
+            war_icon_oneshot          = { name = "OneShot", text = { "Use The Sun 100 times" } }, -- the tarot, should work across matches like all the other count ones
+            war_icon_egg              = { name = "Egg", text = { "Sell an Egg worth $15 or more" } },
             war_icon_bloodstone       = { name = "Bloodstone", text = { "Score 100 heart cards" } },
-            war_icon_pizza            = { name = "Pizza", text = { "Score 100 red seal cards" } },
+            war_icon_pizza            = { name = "Pizza", text = { "Score 250 red or gold seal cards" } }, -- scored, so retriggers don't double count
             war_icon_riff_raff        = { name = "Riff Raff", text = { "Win a game using only Common jokers" } },
-            war_icon_garygpt          = { name = "GaryGPT", text = { "Destroy the Splash Joker in a match" } },
-            war_icon_missing_joker    = { name = "Missing Joker", text = { "Win a game without filling your joker slots" } },
+            war_icon_garygpt          = { name = "GaryGPT", text = { "Destroy the Splash Joker in a match" } }, -- not selling, specifically something like dagger/madness
+            war_icon_missing_joker    = { name = "Missing Joker", text = { "Win a game without filling your joker slots" } }, -- ie always playing with #OfJokerSlots>#OfOwnedJokers
             war_icon_cola             = { name = "Cola", text = { "Have 5 tags at once in a game" } },
-            war_icon_osage            = { name = "Osage", text = { "Score 1,000 Stone cards" } },
+            war_icon_osage            = { name = "Osage", text = { "Score 1,000 Stone cards" } }, -- just 10x the stone card icon unlock
             war_icon_stone            = { name = "Stone", text = { "Score 100 Stone cards" } },
-            war_icon_gold             = { name = "Gold", text = { "Trigger the effect of Gold cards 100 times" } },
-            war_icon_steel            = { name = "Steel", text = { "Trigger the effect of Steel cards 100 times" } },
+            war_icon_gold             = { name = "Gold", text = { "Trigger the effect of Gold cards 100 times" } }, -- them paying out 100 times
+            war_icon_steel            = { name = "Steel", text = { "Trigger the effect of Steel cards 100 times" } }, -- them triggering while held in hand 100 times
             war_icon_wild             = { name = "Wild", text = { "Score 100 Wild cards" } },
             war_icon_mult             = { name = "Mult", text = { "Score 100 Mult cards" } },
-            war_icon_lucky            = { name = "Lucky", text = { "Trigger the effect of Lucky cards 100 times" } },
+            war_icon_lucky            = { name = "Lucky", text = { "Trigger the effect of Lucky cards 100 times" } }, -- the mult or money triggers
             war_icon_white_stake      = { name = "White Stake", text = { "Play 10 matches on the White Stake" } },
             war_icon_red_stake        = { name = "Red Stake", text = { "Play 10 matches on the Red Stake" } },
             war_icon_green_stake      = { name = "Green Stake", text = { "Play 10 matches on the Green Stake" } },
@@ -99,12 +102,22 @@ return {
             war_icon_ghost_deck       = { name = "Ghost Deck", text = { "Play 10 matches on the Ghost Deck" } },
             war_icon_painted_deck     = { name = "Painted Deck", text = { "Play 10 matches on the Painted Deck" } },
             war_icon_plasma_deck      = { name = "Plasma Deck", text = { "Play 10 matches on the Plasma Deck" } },
-            war_icon_red_seal         = { name = "Red Seal", text = { "Trigger the Red Seal 100 times" } },
-            war_icon_blue_seal        = { name = "Blue Seal", text = { "Trigger the Blue Seal 100 times" } },
-            war_icon_gold_seal        = { name = "Gold Seal", text = { "Trigger the Gold Seal 100 times" } },
-            war_icon_purple_seal      = { name = "Purple Seal", text = { "Trigger the Purple Seal 100 times" } },
-            war_icon_eyes             = { name = "Eyes", text = { "Eyes" } },
-            war_icon_supernova        = { name = "Supernova", text = { "Supernova" } },
+            war_icon_red_seal         = { name = "Red Seal", text = { "Trigger the Red Seal 100 times" } }, -- having it retrigger a card 100 times
+            war_icon_blue_seal        = { name = "Blue Seal", text = { "Trigger the Blue Seal 100 times" } }, -- getting a planet from it 100 times
+            war_icon_gold_seal        = { name = "Gold Seal", text = { "Trigger the Gold Seal 100 times" } }, -- getting the money from it 100 times
+            war_icon_purple_seal      = { name = "Purple Seal", text = { "Trigger the Purple Seal 100 times" } }, -- getting the tarot from one 100 times
+            war_icon_eyes             = { name = "Eyes", text = { ">looks inside" } }, -- have both photograph and hanging chad at the same time waow
+            war_icon_hack             = { name = "Hack", text = { "Retrigger a card ranks 2-5 20 times in a single match" } },
+            war_icon_hit_the_road     = { name = "Hit the Road", text = { "Discard 50 Jacks in a single match" } },
+            war_icon_supernova        = { name = "Supernova", text = { "Play a single hand type 25 times in one match" } }, -- so 25 pairs, 25 flushes whatever
+            war_icon_anaglyph_deck    = { name = "Anaglyph Deck", text = { "Play 10 matches on the Anaglyph deck" } },
+            war_icon_black_hole       = { name = "Black Hole", text = { "Use the Black Hole spectral in a game" } },
+            war_icon_canio            = { name = "Canio", text = { "Win a game with Canio" } },
+            war_icon_chicot           = { name = "Chicot", text = { "Win a game with Chicot" } },
+            war_icon_perkeo           = { name = "Perkeo", text = { "Win a game with Perkeo" } },
+            war_icon_tribuolet        = { name = "Triboulet", text = { "Win a game with Triboulet" } },
+            war_icon_yorick           = { name = "Yorick", text = { "Win a game with Yorick" } },
+            war_icon_windows_7        = { name = "Windows 7", text = { "Play a 4OAK of 7s with 4 unique suits" } },
 
             -- Special
             war_icon_bean             = { name = "Bean" },
@@ -122,6 +135,11 @@ return {
             war_icon_baggute          = { name = "Baggute" },
             war_icon_amolyte          = { name = "Amolyte" },
             war_icon_gabby            = { name = "Gabby" },
+            war_icon_willow           = { name = "Willow" },
+            war_icon_george_the_rat   = { name = "GeorgeTheRat" },
+            war_icon_fir              = { name = "Fir" },
+            war_icon_belenos_bear     = { name = "Belenos Bear" },
+            war_icon_vagabond         = { name = "Vagabond" },
         },
         Blind = {},
     },
@@ -129,6 +147,8 @@ return {
     misc = {
         dictionary = {
             -- Main menu / navigation
+            war_github          = "War Github Page", -- unused currently
+            war_kofi            = "War Kofi Page", -- unused currently
             war_discord         = "Join Discord",
             war_single_player   = "Single Player",
             war_online          = "Online",
@@ -137,7 +157,8 @@ return {
             war_join_lobby            = "Join Lobby",
             war_create_lobby          = "Create Lobby",
             war_lobby_code_prompt     = "Lobby Code",
-            war_paste_code            = "Paste Code",
+            war_paste_code            = "Join From Clipboard",
+            war_clipboard_empty       = "No lobby code on the clipboard",
             war_join                  = "Join",
 
             -- Gamemode / ruleset selection
@@ -209,9 +230,6 @@ return {
             -- In-run cash-out
             war_comeback_bonus        = "Comeback",
 
-            -- Achievement unlock notifications
-            war_achievement_unlocked  = "Achievement Unlocked",
-
             -- Ruleset bans
             war_bans_title            = "What this ruleset bans",
             war_view_bans             = "VIEW BANS",
@@ -233,6 +251,7 @@ return {
             war_cs_in_lobby           = "In Lobby",
             war_cs_connected          = "Connected",
             war_cs_offline            = "Offline",
+            war_cs_label              = "[War] V%s (%s)",
 
             -- Lobby side panels
             war_panel_players         = "Players",

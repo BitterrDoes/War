@@ -61,7 +61,7 @@ function WAR.resolve(def)
         if type(src) == "string" then
             local name = src
             src = WAR.LAYERS[name]
-            if not src then print("[WAR] unknown layer: " .. tostring(name)) end
+            if not src then WAR.log("[WAR] unknown layer: " .. tostring(name)) end
         end
         if src then merge_layer(src, out) end
     end
@@ -150,6 +150,7 @@ WAR.LOBBY = {
 
 WAR.GAME = {
     active          = false,
+    won_with        = {},       -- legendaries in the joker slots when the win landed
     my_lives        = 0,
     my_score        = 0,
     -- enemy state (updated live from enemyInfo)
@@ -182,23 +183,32 @@ function WAR.GAME.ease_lives(opts, no_sync)
     if opts.my ~= nil then
         local before = WAR.GAME.my_lives
         WAR.GAME.my_lives = tonumber(opts.my) or WAR.GAME.my_lives
+        if before ~= WAR.GAME.my_lives then
+            WAR.log(string.format("[WAR HUD] my lives %s -> %s", tostring(before), tostring(WAR.GAME.my_lives)))
+        end
+        -- A drop means a life actually went out. The value the relay opens a
+        -- match with is the lobby's own number, so a first message can only read
+        -- as a loss if the server already took one.
         if before and WAR.GAME.my_lives < before then
             if WAR.UI and WAR.UI.tell then
-                WAR.UI.tell(localize('war_life_lost'))
+                WAR.UI.tell(localize('war_life_lost'), nil, true)
             end
-            play_sound("cancel", 0.9,   0.7)
-            play_sound("holo1",  0.865, 0.6)
+            -- Glass break: the cue vanilla uses when a glass card shatters, and
+            -- the only sound for the event (tell is silenced above).
+            play_sound("glass" .. math.random(1, 6), math.random() * 0.2 + 0.9, 0.5)
         end
     end
     if opts.enemy ~= nil then
         local before = WAR.GAME.enemy_lives
         WAR.GAME.enemy_lives = tonumber(opts.enemy) or WAR.GAME.enemy_lives
+        if before ~= WAR.GAME.enemy_lives then
+            WAR.log(string.format("[WAR HUD] enemy lives %s -> %s", tostring(before), tostring(WAR.GAME.enemy_lives)))
+        end
         if before and WAR.GAME.enemy_lives < before then
             if WAR.UI and WAR.UI.tell then
-                WAR.UI.tell(localize('war_rival_life_lost'), G.C.BLUE)
+                WAR.UI.tell(localize('war_rival_life_lost'), G.C.BLUE, true)
             end
-            play_sound("holo1",  0.865, 0.9)
-            play_sound("cancel", 0.9,   0.7)
+            play_sound("war_opp_lost", 1, 0.9)
         end
     end
     if WAR.UI and WAR.UI.refresh_hud then
@@ -222,8 +232,44 @@ WAR.ACH_COUNTERS = {
     "blue_seal", "gold_seal", "purple_seal", "red_seal",
 }
 
+-- Version string for the main-menu status line. `WAR.version` is SMODS' own
+-- field on the mod table — the mod list prints it — so this must not be called
+-- `version` or the page shows a function address instead.
+function WAR.mod_version()
+    if WAR._mod_version then return WAR._mod_version end
+    local function str(v)
+        if type(v) == "string" or type(v) == "number" then return tostring(v) end
+    end
+    local v = str(WAR.version)
+    local meta = SMODS and SMODS.current_mod and SMODS.current_mod.metadata
+    if not v and type(meta) == "table" then v = str(meta.version) end
+    if not v and SMODS and SMODS.Mods and SMODS.Mods.War then
+        v = str(SMODS.Mods.War.version)
+    end
+    if not v then
+        local ok, raw = pcall(function() return SMODS.NFS.read(WAR.ROOT .. "War.json") end)
+        if ok and raw then
+            local ok2, lib = pcall(require, "json")
+            if ok2 and lib then
+                local ok3, data = pcall(lib.decode, raw)
+                if ok3 and type(data) == "table" then v = str(data.version) end
+            end
+        end
+    end
+    WAR._mod_version = v or "?"
+    return WAR._mod_version
+end
+
+-- Lifetime progress towards each counted achievement, as the relay reports it
+-- on login and after every increment. Empty while logged out, in which case the
+-- tooltips simply omit the progress bracket.
+WAR.ACH_PROGRESS = {}
+
+-- Set once the first snapshot lands: the login baseline is not an increment, so
+-- only later snapshots get compared and logged.
+WAR.ACH_PROGRESS_READY = false
+
 WAR.GAME.ach = {}
-WAR.GAME.ach_flags = {}
 
 function WAR.GAME.count(key, n)
     WAR.GAME.ach[key] = (WAR.GAME.ach[key] or 0) + (n or 1)
@@ -231,7 +277,6 @@ end
 
 function WAR.GAME.reset_achievements()
     WAR.GAME.ach = {}
-    WAR.GAME.ach_flags = {}
 end
 
 -- A rival round is a boss blind from pvp_start_ante onward. The boss is not
@@ -287,7 +332,8 @@ end
 -- countdowns can't disagree.
 function WAR.GAME.start_pvp_timer(secs, is_mine, paused)
     if not (secs and secs > 0) then WAR.GAME.stop_pvp_timer(); return end
-    local orig = WAR.GAME._pvp_timer and WAR.GAME._pvp_timer._orig_round
+    local prev = WAR.GAME._pvp_timer
+    local orig = prev and prev._orig_round
     WAR.GAME._pvp_timer = {
         start             = (G.TIMERS and G.TIMERS.REAL) or 0,
         secs              = secs,
@@ -296,6 +342,11 @@ function WAR.GAME.start_pvp_timer(secs, is_mine, paused)
         _paused_remaining = paused and secs or nil,
         _orig_round       = orig,
     }
+    -- Cue only a fresh start: the relay re-sends the clock as each side readies,
+    -- and a resume from pause is not a new blind.
+    if not paused and not prev then
+        play_sound("other1", 1, 1)
+    end
     if WAR.UI and WAR.UI.setup_timer_hud then WAR.UI.setup_timer_hud() end
 end
 
@@ -304,6 +355,33 @@ function WAR.GAME.stop_pvp_timer()
     if t and t._orig_round and G.GAME then G.GAME.round = t._orig_round end
     WAR.GAME._pvp_timer = nil
     if WAR.UI and WAR.UI.reset_timer_hud then WAR.UI.reset_timer_hud() end
+end
+
+-- Legendary jokers: winning a match with one in the joker slots unlocks its icon.
+WAR.GAME.LEGENDARY_JOKERS = {
+    canio     = "j_canio",
+    chicot    = "j_chicot",
+    perkeo    = "j_perkeo",
+    tribuolet = "j_triboulet",
+    yorick    = "j_yorick",
+}
+
+-- Taken in the winGame handler, while G.jokers still holds the run's cards.
+-- By the time check_for_unlock fires, exit_war_profile has reloaded the profile
+-- and the slots are gone, so the claim predicates read this snapshot instead.
+function WAR.GAME.snapshot_legendaries()
+    local held = {}
+    for _, card in ipairs((G.jokers and G.jokers.cards) or {}) do
+        local center = card.config and card.config.center
+        for icon, joker in pairs(WAR.GAME.LEGENDARY_JOKERS) do
+            if center and center.key == joker then held[icon] = true end
+        end
+    end
+    WAR.GAME.won_with = held
+end
+
+function WAR.GAME.won_with_legendary(icon)
+    return (WAR.GAME.won_with and WAR.GAME.won_with[icon]) or false
 end
 
 WAR.NET = {
@@ -352,10 +430,14 @@ SMODS.Atlas({ key="lobby_card",  path="lobby_card.png",  px=71,  py=95  })
 SMODS.Atlas({ key="war_titlecard",  path="mod_title_mini.png",  px=115,  py=85  })
 -- Icon picker sheets (21-frame animated, one row per icon)
 SMODS.Atlas({ key="war_socials", path="mod_socials.png", px=25, py=28 })
-SMODS.Atlas({ key="war_icons_free",        path="icons_free.png",        px=34, py=34, atlas_table="ANIMATION_ATLAS", frames=21 })
-SMODS.Atlas({ key="war_icons_achievement", path="icons_achievement.png", px=34, py=34, atlas_table="ANIMATION_ATLAS", frames=21 })
-SMODS.Atlas({ key="war_icons_special",     path="icons_special.png",     px=34, py=34, atlas_table="ANIMATION_ATLAS", frames=21 })
-SMODS.Atlas({ key="war_icons_locked",      path="locked_icon.png",       px=34, py=34, atlas_table="ANIMATION_ATLAS", frames=21 })
+-- force_pixel keeps these sheets out of SMODS's texture_scaling rescale: at
+-- texture_scaling 2 it otherwise builds a 2x canvas through a smooth shader,
+-- which is what turned every icon soft. Nearest sampling keeps the 34px art
+-- as hard pixels at whatever the UI draws them at.
+SMODS.Atlas({ key="war_icons_free",        path="icons_free.png",        px=34, py=34, atlas_table="ANIMATION_ATLAS", frames=21, force_pixel=true })
+SMODS.Atlas({ key="war_icons_achievement", path="icons_achievement.png", px=34, py=34, atlas_table="ANIMATION_ATLAS", frames=21, force_pixel=true })
+SMODS.Atlas({ key="war_icons_special",     path="icons_special.png",     px=34, py=34, atlas_table="ANIMATION_ATLAS", frames=21, force_pixel=true })
+SMODS.Atlas({ key="war_icons_locked",      path="locked_icon.png",       px=34, py=34, atlas_table="ANIMATION_ATLAS", frames=21, force_pixel=true })
 
 -- Full IEEE 754 double precision for wire transmission: any score Balatro can
 -- produce (up to ~1.8e308) survives the JSON round-trip without loss of
@@ -392,4 +474,4 @@ function WAR.SCORE.format(n)
     return tostring(math.floor(n))
 end
 
-print("[WAR] globals loaded")
+WAR.log("[WAR] globals loaded")

@@ -28,6 +28,8 @@ ACHIEVEMENT_ICONS = {
     'red_deck', 'blue_deck', 'yellow_deck', 'green_deck', 'black_deck',
     'ghost_deck', 'painted_deck', 'plasma_deck', 'red_seal', 'blue_seal',
     'gold_seal', 'purple_seal', 'eyes', 'hack', 'hit_the_road', 'supernova',
+    'anaglyph_deck', 'black_hole', 'canio', 'chicot', 'perkeo', 'tribuolet',
+    'yorick', 'windows_7',
 }
 
 DB = "/opt/war.db"

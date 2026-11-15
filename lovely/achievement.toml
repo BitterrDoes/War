@@ -33,8 +33,8 @@ position     = "after"
 match_indent = true
 payload      = """
 if _type == 'war_icon' then
-    _c = WAR.AVATAR.icon(_achievement)
-    _c.pos = { x = 0, y = _c.row }
+    local _icon = WAR.AVATAR.icon(_achievement)
+    _c = _icon and { atlas = _icon.atlas, pos = { x = 0, y = _icon.row } }
 end
 """
 
@@ -45,7 +45,7 @@ pattern      = '''_type == 'Back' and localize('k_deck') or'''
 position     = "after"
 match_indent = true
 payload      = """
-_type == 'war_icon' and localize('war_icon') or
+_type == 'war_icon' and localize{ key = "war_icon_" .. _achievement, set = 'WAR_Icon', type = 'name_text' } or
 """
 
 # Track Red Seal triggers
@@ -57,7 +57,6 @@ position     = "after"
 match_indent = true
 payload      = """
     if WAR.GAME.active then
-        WAR.GAME.count('pizza')
         WAR.GAME.count('red_seal')
     end
 """

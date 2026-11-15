@@ -67,11 +67,36 @@ function G.FUNCS.war_join_screen(e)
     WAR.UI.open(G.UIDEF.war_join_screen())
 end
 
+-- Reads the clipboard and joins straight away. A code is five characters, so
+-- take the first run of that length — a copied "join war ABCDE" or a link still
+-- lands on the right token instead of the first five characters of the text.
 function G.FUNCS.war_paste_code(e)
     local ok, text = pcall(function() return love.system.getClipboardText() end)
-    if ok and text then
-        WAR.UI._join_code.code = string.sub(string.upper(text:gsub("[^%a%d]","")), 1, 5)
+    local exact, loose
+    for run in ((ok and text) or ""):upper():gmatch("[%u%d]+") do
+        if #run == 5 then exact = run
+        elseif not loose and #run > 5 then loose = run:sub(1, 5) end
     end
+    local code = exact or loose
+    if not code then
+        -- Last resort for a code that got split by a space or a dash.
+        local flat = ((ok and text) or ""):upper():gsub("[^%u%d]", "")
+        if #flat >= 5 then code = flat:sub(1, 5) end
+    end
+    if not code then
+        WAR.UI.open(create_UIBox_generic_options({
+            back_func = "war_join_screen",
+            contents = {
+                { n=G.UIT.R, config={ align="cm", padding=0.1 }, nodes={
+                    { n=G.UIT.T, config={ text=localize('war_clipboard_empty'),
+                        scale=0.38, colour=G.C.RED, shadow=true }},
+                }},
+            },
+        }))
+        return
+    end
+    WAR.UI._join_code.code = code
+    G.FUNCS.war_do_join(e)
 end
 
 function G.FUNCS.war_do_join(e)
@@ -455,4 +480,4 @@ function G.FUNCS.war_confirm_ruleset(e)
     war_do_create_with_config()
 end
 
-print("[WAR] ui/screens loaded")
+WAR.log("[WAR] ui/screens loaded")

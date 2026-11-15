@@ -6,7 +6,8 @@
 --   lobby:    created, joined, guest_joined, peer_left, peer_rejoined,
 --             rejoined, peer_ready, stopGame, lobbyOptions/config, error, stats
 --   game:     startGame, startBlind, enemyInfo, playerInfo, enemyLocation,
---             endPvP, winGame, loseGame, chat, achievementUnlocked, entitlementGranted
+--             endPvP, winGame, loseGame, chat, achievementUnlocked, entitlementGranted,
+--             counters
 --
 -- WAR.NET.poll() is called every frame from game_hooks.lua and returns a list
 -- of decoded JSON messages. Auth messages go to WAR.AUTH.handle; everything
@@ -61,7 +62,7 @@ function WAR.SYNC.tick()
             if WAR.LOBBY.push_config then WAR.LOBBY.push_config() end
             if WAR.UI.on_lobby_created then
                 local ok, err = pcall(WAR.UI.on_lobby_created, m.code)
-                if not ok then print("[WAR SYNC] on_lobby_created: " .. tostring(err)) end
+                if not ok then WAR.log("[WAR SYNC] on_lobby_created: " .. tostring(err)) end
             end
 
         elseif a == "joined" then
@@ -216,6 +217,13 @@ function WAR.SYNC.tick()
         elseif a == "winGame" then
             WAR.GAME.score_result = m
             WAR.GAME.send_end_increments()
+            -- Missing Joker is judged on the slots as they stand when the win
+            -- lands, so a joker slotted in after the last hand still voids it.
+            if WAR.GAME.missing_joker_valid and G.jokers then
+                local lim = G.jokers.config and G.jokers.config.card_limit or 5
+                if #G.jokers.cards >= lim then WAR.GAME.missing_joker_valid = false end
+            end
+            WAR.GAME.snapshot_legendaries()
             WAR.SYNC.on_game_over(true)
             check_for_unlock({type = 'war_win'})
 
@@ -231,18 +239,37 @@ function WAR.SYNC.tick()
         elseif a == "achievementUnlocked" then
             local key = m.key
             if key then
+                -- The relay only sends this for a fresh grant, so it is the
+                -- one place every unlock is announced: claimed one-offs and
+                -- the count-based ones the server settles itself.
+                local fresh = not WAR.AVATAR.is_entitled(key)
                 WAR.AVATAR.grant_local(key)
-                local title = localize("war_achievement_unlocked") or "Achievement Unlocked"
-                local name  = localize("war_icon_" .. key) or key
-                if WAR.UI.tell then WAR.UI.tell(title .. ": " .. name, G.C.PURPLE) end
+                if fresh and WAR.AVATAR.icon(key) then
+                    notify_alert(key, 'war_icon')
+                end
             end
 
         elseif a == "entitlementGranted" then
             local key = m.key
             if key then
                 WAR.AVATAR.grant_local(key)
-                local name = localize("war_icon_" .. key) or key
-                if WAR.UI.tell then WAR.UI.tell(name .. " icon unlocked", G.C.PURPLE) end
+                if WAR.UI.tell then WAR.UI.tell(WAR.AVATAR.name(key) .. " icon unlocked", G.C.PURPLE) end
+            end
+
+        elseif a == "counters" then
+            if m.counters and type(m.counters) == "table" then
+                if WAR.ACH_PROGRESS_READY then
+                    for key, total in pairs(m.counters) do
+                        local before = tonumber(WAR.ACH_PROGRESS[key]) or 0
+                        local now    = tonumber(total) or 0
+                        if now > before then
+                            WAR.log(string.format("[WAR] %s incremented (%d) now (%d)",
+                                                  WAR.AVATAR.name(key), now - before, now))
+                        end
+                    end
+                end
+                WAR.ACH_PROGRESS = m.counters
+                WAR.ACH_PROGRESS_READY = true
             end
         end
     end
@@ -250,14 +277,20 @@ end
 
 function WAR.SYNC.on_start_game(m)
     WAR.GAME.active       = true
+    WAR.GAME.won_with     = {}
     WAR.GAME.my_lives     = tonumber(m.lives) or 4
     WAR.GAME.enemy_lives  = tonumber(m.lives) or 4
+    -- Fresh list of sounds for the sound tracer (game_hooks).
+    WAR.GAME._sounds_heard = {}
     WAR.GAME.enemy_score  = 0
     WAR.GAME.enemy_score_display = 0
     WAR.GAME._score_ease  = nil
     WAR.GAME.jolly_valid  = true
     WAR.GAME.droll_valid  = true
     WAR.GAME.prob_hits    = 0
+    WAR.GAME.hand_counts  = {}
+    WAR.GAME.jacks_discarded = 0
+    WAR.GAME.hack_hits       = 0
     WAR.GAME.riff_raff_valid   = true
     WAR.GAME.missing_joker_valid = true
     WAR.GAME.match_stake         = nil
@@ -369,6 +402,18 @@ function WAR.SYNC.on_start_blind(m)
     local e = WAR.GAME._pending_blind_e
     WAR.GAME._pending_blind_e = nil
     WAR.GAME._blind_starting  = true
+    -- The select screen's rival icon is pinned to the boss chip in the UIBox
+    -- that's about to be torn down by select_blind. Clear it before the
+    -- transition so the boss_badge sprite is removed from G.ANIMATIONS rather
+    -- than left drawing indefinitely behind the blind.
+    if WAR.UI and WAR.UI._rival_icons then
+        for i = #WAR.UI._rival_icons, 1, -1 do
+            if WAR.UI._rival_icons[i].tag == "select" then
+                WAR.UI.drop_rival_icon(WAR.UI._rival_icons[i])
+                table.remove(WAR.UI._rival_icons, i)
+            end
+        end
+    end
     if e then
         G.FUNCS.select_blind(e)
     end
@@ -397,12 +442,8 @@ function WAR.SYNC.on_enemy_info(m)
         WAR.GAME.enemy_hands_masked = false
     end
     if m.skips ~= nil then
-        local skips = tonumber(m.skips) or 0
-        if skips > (WAR.GAME.enemy_skips or 0) then
-            play_sound("negative", 0.865, 0.4)
-            play_sound("gong",     0.765, 0.4)
-        end
-        WAR.GAME.enemy_skips = skips
+        -- Skipping is tracked for the blind clock; it has no cue of its own.
+        WAR.GAME.enemy_skips = tonumber(m.skips) or 0
     end
     if m.lives ~= nil then
         WAR.GAME.ease_lives({ enemy = tonumber(m.lives) }, true)
@@ -480,4 +521,4 @@ function WAR.MODCOMPAT.get(mod_id)
     return WAR.MODCOMPAT._state[mod_id]
 end
 
-print("[WAR] sync loaded")
+WAR.log("[WAR] sync loaded")

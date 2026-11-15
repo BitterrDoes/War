@@ -6,6 +6,12 @@ function WAR.LOBBY.create()
     -- Gamemode and related config set by selection screen; apply defaults for anything missing
     if not WAR.LOBBY.config.gamemode then WAR.LOBBY.config.gamemode = "vanilla" end
     if not WAR.LOBBY.config.lives    then WAR.LOBBY.config.lives    = 4 end
+    -- Fresh lobby, fresh run choices: every lobby starts on the vanilla default
+    -- deck and stake instead of whatever the last run happened to use.
+    WAR.LOBBY.config.back      = "Red Deck"
+    WAR.LOBBY.config.stake     = 1
+    WAR.LOBBY.config.sleeve    = nil
+    WAR.LOBBY.config.challenge = nil
     -- seed intentionally not set here; the deck selector is where the host picks it,
     -- and the server calls gen_seed() when none is provided.
 
@@ -27,6 +33,12 @@ end
 
 function WAR.LOBBY.join(code)
     WAR.LOBBY_STATE = "joining"
+    -- Drop the last run's choices before the host's config lands, so the panel
+    -- never shows a deck or stake from a previous match.
+    WAR.LOBBY.config.back      = "Red Deck"
+    WAR.LOBBY.config.stake     = 1
+    WAR.LOBBY.config.sleeve    = nil
+    WAR.LOBBY.config.challenge = nil
     local ok, err = WAR.NET.connect()
     if not ok then WAR.LOBBY_STATE = "none"; return false, err end
     local mod_ver, smods_ver = WAR.mod_versions()
@@ -71,6 +83,12 @@ function WAR.LOBBY.leave()
     WAR.LOBBY.config.timer_seconds           = 90
     WAR.LOBBY.config.pvp_start_ante          = 3
     WAR.LOBBY.config.seed                    = nil
+    -- Run choices belong to the lobby that picked them; without this the next
+    -- lobby inherits the deck, stake, sleeve and challenge of the last run.
+    WAR.LOBBY.config.back                    = nil
+    WAR.LOBBY.config.stake                   = nil
+    WAR.LOBBY.config.sleeve                  = nil
+    WAR.LOBBY.config.challenge               = nil
     WAR.LOBBY.config.death_on_round_loss     = true
     WAR.LOBBY.config.hide_score_until_played = false
     WAR.LOBBY.config.comeback_gold           = true
@@ -81,4 +99,4 @@ function WAR.LOBBY.leave()
     end
 end
 
-print("[WAR] lobby loaded")
+WAR.log("[WAR] lobby loaded")

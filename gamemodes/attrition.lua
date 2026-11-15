@@ -7,4 +7,4 @@ WAR.GAMEMODES["vanilla"] = {
     pvp_start_ante      = 3,
 }
 
-print("[WAR] gamemode: vanilla loaded")
+WAR.log("[WAR] gamemode: vanilla loaded")

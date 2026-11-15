@@ -27,7 +27,7 @@ function WAR.NET.connect()
     WAR.NET.sock = sock
     recv_buf = ""
     WAR.NET._expected_seq = nil
-    WAR.log("[WAR NET] connected to relay")
+    WAR.log(string.format("[WAR NET] connected to relay %s:%d", WAR.NET.RELAY_HOST, port))
     return true
 end
 
@@ -48,16 +48,13 @@ end
 function WAR.NET.send(msg)
     if not sock then return end
     local ok, err = sock:send(json.encode(msg) .. "\n")
-    if not ok then print("[WAR NET] send err: " .. tostring(err)) end
+    if not ok then WAR.log("[WAR NET] send err: " .. tostring(err)) end
 end
 
 -- Achievement plumbing. Call sites name the achievement key and nothing else,
 -- so the wire shape lives in one place per direction.
 function WAR.NET.claim_achievement(key)
     if not key then return end
-    if not WAR.AVATAR.is_entitled(key) then
-        notify_alert(key, 'war_icon')
-    end
     WAR.NET.send({ action = "claimAchievement", key = key })
 end
 
@@ -93,7 +90,7 @@ function WAR.NET.poll()
             local seq = decoded._seq
             if seq ~= nil then
                 if WAR.NET._expected_seq ~= nil and seq ~= WAR.NET._expected_seq then
-                    print("[WAR NET] seq gap: expected " .. WAR.NET._expected_seq
+                    WAR.log("[WAR NET] seq gap: expected " .. WAR.NET._expected_seq
                           .. " got " .. seq)
                 end
                 WAR.NET._expected_seq = seq + 1
@@ -112,4 +109,4 @@ end
 
 function WAR.NET.on_relay_disconnected() end
 
-print("[WAR] net loaded")
+WAR.log("[WAR] net loaded")

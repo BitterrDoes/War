@@ -50,6 +50,11 @@ WAR.ICONS = {
     { key = "chud",            atlas = "war_icons_free",         row = 35 },
     { key = "sob",             atlas = "war_icons_free",         row = 36 },
     { key = "tasque_manager",  atlas = "war_icons_free",         row = 37 },
+    { key = "mizzle",          atlas = "war_icons_free",         row = 38 },
+    { key = "ironclad",        atlas = "war_icons_free",         row = 39 },
+    { key = "rodeo_abandoned_by_god", atlas = "war_icons_free",   row = 40 },
+    { key = "three_cheers_one",atlas = "war_icons_free",         row = 41 },
+    { key = "three_cheers_two",atlas = "war_icons_free",         row = 42 },
     { key = "jolly",           atlas = "war_icons_achievement",  row = 0,  achieve = function(self, args) if args.type == 'war_win' then return WAR.GAME.jolly_valid end end },
     { key = "oops",            atlas = "war_icons_achievement",  row = 1,  achieve = function(self, args) if args.type == 'war_oops' then return true end end },
     { key = "droll",           atlas = "war_icons_achievement",  row = 2,  achieve = function(self, args) if args.type == 'war_win' then return WAR.GAME.droll_valid end end },
@@ -89,14 +94,22 @@ WAR.ICONS = {
     { key = "ghost_deck",      atlas = "war_icons_achievement",  row = 36, achieve = "ghost_deck" },
     { key = "painted_deck",    atlas = "war_icons_achievement",  row = 37, achieve = "painted_deck" },
     { key = "plasma_deck",     atlas = "war_icons_achievement",  row = 38, achieve = "plasma_deck" },
-    { key = "red_seal",        atlas = "war_icons_achievement",  row = 39, achieve = "red_seal" },
-    { key = "blue_seal",       atlas = "war_icons_achievement",  row = 40, achieve = "blue_seal" },
-    { key = "gold_seal",       atlas = "war_icons_achievement",  row = 41, achieve = "gold_seal" },
-    { key = "purple_seal",     atlas = "war_icons_achievement",  row = 42, achieve = "purple_seal" },
-    { key = "eyes",            atlas = "war_icons_achievement",  row = 43, achieve = "eyes" },
-    { key = "hack",            atlas = "war_icons_achievement",  row = 44, achieve = "hack" },
-    { key = "hit_the_road",    atlas = "war_icons_achievement",  row = 45, achieve = "hit_the_road" },
-    { key = "supernova",       atlas = "war_icons_achievement",  row = 46, achieve = "supernova" },
+    { key = "anaglyph_deck",   atlas = "war_icons_achievement",  row = 39, achieve = "anaglyph_deck" },
+    { key = "red_seal",        atlas = "war_icons_achievement",  row = 40, achieve = "red_seal" },
+    { key = "blue_seal",       atlas = "war_icons_achievement",  row = 41, achieve = "blue_seal" },
+    { key = "gold_seal",       atlas = "war_icons_achievement",  row = 42, achieve = "gold_seal" },
+    { key = "purple_seal",     atlas = "war_icons_achievement",  row = 43, achieve = "purple_seal" },
+    { key = "eyes",            atlas = "war_icons_achievement",  row = 44, achieve = function(self, args) if args.type == 'war_eyes' then return true end end },
+    { key = "hack",            atlas = "war_icons_achievement",  row = 45, achieve = function(self, args) if args.type == 'war_hack' then return true end end },
+    { key = "hit_the_road",    atlas = "war_icons_achievement",  row = 46, achieve = function(self, args) if args.type == 'war_hit_the_road' then return true end end },
+    { key = "supernova",       atlas = "war_icons_achievement",  row = 47, achieve = function(self, args) if args.type == 'war_supernova' then return true end end },
+    { key = "black_hole",      atlas = "war_icons_achievement",  row = 48, achieve = function(self, args) if args.type == 'war_black_hole' then return true end end },
+    { key = "canio",           atlas = "war_icons_achievement",  row = 49, achieve = function(self, args) if args.type == 'war_win' then return WAR.GAME.won_with_legendary("canio") end end },
+    { key = "chicot",          atlas = "war_icons_achievement",  row = 50, achieve = function(self, args) if args.type == 'war_win' then return WAR.GAME.won_with_legendary("chicot") end end },
+    { key = "perkeo",          atlas = "war_icons_achievement",  row = 51, achieve = function(self, args) if args.type == 'war_win' then return WAR.GAME.won_with_legendary("perkeo") end end },
+    { key = "tribuolet",       atlas = "war_icons_achievement",  row = 52, achieve = function(self, args) if args.type == 'war_win' then return WAR.GAME.won_with_legendary("tribuolet") end end },
+    { key = "yorick",          atlas = "war_icons_achievement",  row = 53, achieve = function(self, args) if args.type == 'war_win' then return WAR.GAME.won_with_legendary("yorick") end end },
+    { key = "windows_7",      atlas = "war_icons_achievement",  row = 54, achieve = function(self, args) if args.type == 'war_four_sevens' then return true end end },
     { key = "bean",            atlas = "war_icons_special",      row = 0,  special = true },
     { key = "zaino",           atlas = "war_icons_special",      row = 1,  special = true },
     { key = "doc",             atlas = "war_icons_special",      row = 2,  special = true },
@@ -112,6 +125,11 @@ WAR.ICONS = {
     { key = "baggute",         atlas = "war_icons_special",      row = 12, special = true },
     { key = "amolyte",         atlas = "war_icons_special",      row = 13, special = true },
     { key = "gabby",           atlas = "war_icons_special",      row = 14, special = true },
+    { key = "willow",          atlas = "war_icons_special",      row = 15, special = true },
+    { key = "george_the_rat",  atlas = "war_icons_special",      row = 16, special = true },
+    { key = "fir",             atlas = "war_icons_special",      row = 17, special = true },
+    { key = "belenos_bear",    atlas = "war_icons_special",      row = 18, special = true },
+    { key = "vagabond",        atlas = "war_icons_special",      row = 19, special = true },
 }
 
 WAR.AVATAR.selected = "jimbo"
@@ -152,6 +170,29 @@ function WAR.AVATAR.grant_local(key)
         if k == key then return end
     end
     WAR.AVATAR.entitlements[#WAR.AVATAR.entitlements + 1] = key
+end
+
+-- Display name for an icon key. The war_icon_* names live in the WAR_Icon
+-- description set, not the flat dictionary, so they need the table form of
+-- localize; an unknown key falls back to the wire key.
+function WAR.AVATAR.name(key)
+    local loc_key = "war_icon_" .. key
+    local name = localize{ key = loc_key, set = 'WAR_Icon', type = 'name_text' }
+    if not name or name == 'ERROR' then return key end
+    return name
+end
+
+-- Unlock condition for an icon, with how far the account has got in brackets
+-- after the target number: "Score 100 [39] Stone cards". Only the counted
+-- achievements have progress, so everything else comes back untouched.
+function WAR.AVATAR.describe(key)
+    local loc_key = "war_icon_" .. key
+    local text = localize{ key = loc_key, set = 'WAR_Icon', type = 'raw_descriptions' }[1]
+    if not text then return key end
+    if WAR.AVATAR.is_entitled(key) then return text end
+    local progress = WAR.ACH_PROGRESS and WAR.ACH_PROGRESS[key]
+    if not progress then return text end
+    return (text:gsub("(%d[%d,]*)", "%1 [" .. progress .. "]", 1))
 end
 
 -- Stored in SMODS config (config/War.jkr, field `icon`).
@@ -212,4 +253,4 @@ function WAR.AVATAR.sprite(role, size)
     return WAR.AVATAR.sprite_for(key, size)
 end
 
-print("[WAR] avatar loaded")
+WAR.log("[WAR] avatar loaded")

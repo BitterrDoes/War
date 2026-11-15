@@ -174,6 +174,11 @@ function WAR.AUTH.handle(msg)
                 WAR.AVATAR.grant_local(k)
             end
         end
+        -- ... and the lifetime achievement counters, for the icon tooltips.
+        if msg.counters and type(msg.counters) == "table" then
+            WAR.ACH_PROGRESS = msg.counters
+            WAR.ACH_PROGRESS_READY = true
+        end
         if WAR.AUTH.on_done then WAR.AUTH.on_done(true, nil) end
 
     elseif a == "logged_out" then
@@ -181,7 +186,7 @@ function WAR.AUTH.handle(msg)
         if WAR.AUTH.on_done then WAR.AUTH.on_done(true, nil) end
 
     elseif a == "auth_error" then
-        print("[WAR AUTH] auth_error " .. tostring(msg.reason))
+        WAR.log("[WAR AUTH] auth_error " .. tostring(msg.reason))
         WAR.AUTH.state = "idle"
         WAR.AUTH._pending_password = nil
         WAR.AUTH._pending_username = nil
@@ -242,4 +247,4 @@ function WAR.AUTH.logout(cb)
     if cb then cb(true) end
 end
 
-print("[WAR] auth loaded")
+WAR.log("[WAR] auth loaded")

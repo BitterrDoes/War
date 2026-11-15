@@ -14,4 +14,4 @@ end
 
 function WAR.is_pvp_blind() return WAR.GAME.pvp_round() end
 
-print("[WAR] pvp blind loaded")
+WAR.log("[WAR] pvp blind loaded")

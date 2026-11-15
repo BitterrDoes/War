@@ -3,8 +3,9 @@ version = "1.0.0"
 dump_lua = false
 priority = 0
 
-# Replace boss blind sprite with opponent's chosen blind sprite when blind is set
-# Only happens during PVP
+# Replace the in-run blind chip with the rival pfp and add a mini boss badge.
+# Clears any stale main_blind_icon before attaching to prevent duplication on
+# boss rerolls (each set_blind call would otherwise stack another badge).
 [[patches]]
 [patches.pattern]
 target       = "blind.lua"
@@ -13,6 +14,10 @@ position     = "before"
 match_indent = true
 payload      = """
 if WAR.is_pvp_blind() then
+    if self.children.main_blind_icon then
+        self.children.main_blind_icon:remove()
+        self.children.main_blind_icon = nil
+    end
     local atlas_key, row = WAR.UI.rival_icon_row()
     local pos = { x = 0, y = row }
     self.children.animatedSprite = SMODS.create_sprite(self.T.x, self.T.y, self.T.w, self.T.h, atlas_key, pos)
@@ -20,8 +25,9 @@ if WAR.is_pvp_blind() then
 end
 """
 
-# Replace boss blind sprite during blind select with opponent's chosen blind sprite
-# Only happens during PVP
+# Replace the select-screen blind chip with the rival pfp and add a mini boss
+# badge. type == 'Boss' keeps this inert in create_UIBox_round_scores_row,
+# where `type` is the Lua builtin (not the blind panel string).
 [[patches]]
 [patches.pattern]
 target       = "functions/UI_definitions.lua"
@@ -29,11 +35,11 @@ pattern      = "blind_choice.animation:define_draw_steps({"
 position     = "before"
 match_indent = true
 payload      = """
-local cfg  = (WAR.LOBBY and WAR.LOBBY.config) or {}
-local ante = (G.GAME and G.GAME.round_resets and G.GAME.round_resets.ante) or 1
-local is_pvp_ante = false
-if ante >= (cfg.pvp_start_ante or 3) and blind_choice.config.boss then
-    is_pvp_ante = true
+local war_cfg  = (WAR.LOBBY and WAR.LOBBY.config) or {}
+local war_ante = (G.GAME and G.GAME.round_resets and G.GAME.round_resets.ante) or 1
+local is_pvp_ante = (WAR.GAME and WAR.GAME.active and not run_info and type == 'Boss'
+    and war_ante >= (war_cfg.pvp_start_ante or 3) and blind_choice.config.boss) and true or false
+if is_pvp_ante then
     local atlas_key, row = WAR.UI.rival_icon_row()
     local pos = { x = 0, y = row }
     blind_choice.animation = SMODS.create_sprite(0, 0, 1.4, 1.4, atlas_key, pos)
@@ -52,6 +58,6 @@ match_indent = true
 payload      = """
 if is_pvp_ante then
     local opp_name = WAR.LOBBY.is_host and WAR.LOBBY.guest_name or WAR.LOBBY.host_name
-    loc_name = opp_name
+    if opp_name then loc_name = opp_name end
 end
 """

@@ -4,6 +4,32 @@ local _auto_login_done = false
 
 WAR.GAME.prob_hits = 0
 
+-- Oops counts probability rolls that land. Mod jokers roll through
+-- SMODS.pseudorandom_probability, which posts a pseudorandom_result context a
+-- frame later; vanilla jokers roll with plain pseudorandom(seed, 1, n) and never
+-- reach that path, so wrap the global and pick up the rolls that come back at
+-- the low end of the range (the "1 in n landed" case).
+function WAR.GAME.prob_hit()
+    if not WAR.GAME.active or not WAR.GAME.pvp_round() then return end
+    WAR.GAME.prob_hits = (WAR.GAME.prob_hits or 0) + 1
+    if WAR.GAME.prob_hits >= 25 then
+        check_for_unlock({ type = 'war_oops' })
+    end
+end
+
+if pseudorandom and not WAR.GAME._prob_wrapped then
+    WAR.GAME._prob_wrapped = true
+    local _pseudorandom = pseudorandom
+    pseudorandom = function(seed, min, max)
+        local ret = _pseudorandom(seed, min, max)
+        if min and max and max > 1 and ret == min then
+            WAR.GAME.prob_hit()
+        end
+        return ret
+    end
+end
+
+
 -- The pause menu row is hidden by a Lovely patch; this stops the copy button
 -- (or any mod that calls it) from putting the seed on the clipboard.
 local _orig_copy_seed = G.FUNCS.copy_seed
@@ -33,13 +59,20 @@ function Game:update(dt)
             G.GAME.round = t._paused_remaining or t.secs
         else
             local elapsed = G.TIMERS.REAL - t.start
-            G.GAME.round  = math.max(0, math.ceil(t.secs - elapsed))
+            local left    = math.max(0, math.ceil(t.secs - elapsed))
+            G.GAME.round  = left
+            -- Final ten seconds: one click per second, keyed off the countdown
+            -- so a slow frame can neither double up nor skip a click.
+            if left > 0 and left <= 10 and t._last_click ~= left then
+                t._last_click = left
+                play_sound("war_timer", 1, 1)
+            end
         end
     end
     if WAR.UI.sync_rival_icons then WAR.UI.sync_rival_icons() end
     if WAR.NET.connected() then
         local ok, err = pcall(WAR.SYNC.tick)
-        if not ok then print("[WAR TICK] " .. tostring(err)) end
+        if not ok then WAR.log("[WAR TICK] " .. tostring(err)) end
     end
     -- Score goes out on hand end, blind start, deck-out and hand-count gains.
     -- Never mid-scoring: those frames carry partial totals.
@@ -113,6 +146,20 @@ function Game:start_run(start_params)
         for k in pairs(WAR.banned_keys_for(gm_key, rs_key)) do
             G.GAME.banned_keys[k] = true
         end
+        -- The first round's blind tags are pre-computed inside _orig_start_run
+        -- before banned_keys is populated, so they can be banned items.
+        -- Re-pick them now that the full ban list is final. Only fires when
+        -- something is actually banned; standard ruleset skips this entirely.
+        -- Both players in the same lobby use the same ruleset, so both re-pick
+        -- the same number of times and the pseudorandom sequence stays in sync.
+        if next(G.GAME.banned_keys) and G.GAME.round_resets and G.GAME.round_resets.blind_tags then
+            if G.GAME.round_resets.blind_tags.Small then
+                G.GAME.round_resets.blind_tags.Small = get_next_tag_key()
+            end
+            if G.GAME.round_resets.blind_tags.Big then
+                G.GAME.round_resets.blind_tags.Big = get_next_tag_key()
+            end
+        end
     end
     if WAR.GAME.active and WAR.UI.setup_lives_hud then
         G.E_MANAGER:add_event(Event({
@@ -125,7 +172,6 @@ end
 local _orig_reroll_boss = G.FUNCS.reroll_boss
 if _orig_reroll_boss then
     G.FUNCS.reroll_boss = function(e)
-        if WAR.GAME.active then return end
         _orig_reroll_boss(e)
     end
 end
@@ -159,34 +205,8 @@ end
 
 function WAR.GAME.send_hand_state(score, hands)
     if not score then WAR.GAME.settle_chips() end
-    if G.play and G.play.cards and #G.play.cards > 0 then
-        -- Jolly: invalidate if no pair in this hand.
-        local ranks = {}
-        local has_pair = false
-        for _, card in ipairs(G.play.cards) do
-            if card.base and card.base.value then
-                local r = card.base.value
-                ranks[r] = (ranks[r] or 0) + 1
-                if ranks[r] >= 2 then has_pair = true; break end
-            end
-        end
-        if not has_pair then WAR.GAME.jolly_valid = false end
-        -- Droll: invalidate if not all 5 cards share a suit.
-        if #G.play.cards == 5 then
-            local suit = nil
-            local is_flush = true
-            for _, card in ipairs(G.play.cards) do
-                local s = card.base and card.base.suit
-                if s and s ~= "Wild" then
-                    if not suit then suit = s
-                    elseif s ~= suit then is_flush = false; break end
-                end
-            end
-            if not is_flush then WAR.GAME.droll_valid = false end
-        else
-            WAR.GAME.droll_valid = false
-        end
-    end
+    -- Jolly and Droll are judged in the evaluate_poker_hand context instead: by
+    -- the time this runs the played cards have already left G.play.
     -- Missing joker: invalidate if joker slots are full at any hand.
     if WAR.GAME.missing_joker_valid and G.jokers then
         local lim = G.jokers.config and G.jokers.config.card_limit or 5
@@ -330,11 +350,11 @@ function Game:update_hand_played(dt)
                         G.STATE          = G.STATES.DRAW_TO_HAND
                         G.STATE_COMPLETE = false
                     else
-                        -- Hands exhausted: discard remaining cards and show waiting
-                        -- indicator. The end_pvp check above fires when endPvP arrives.
-                        if G.hand and G.hand.cards[1] then
-                            G.FUNCS.draw_from_hand_to_discard()
-                        end
+                        -- Hands exhausted: show waiting indicator and park here until
+                        -- endPvP arrives. Do NOT discard the hand yet — end_round()
+                        -- (called from update_new_round) runs SMODS.calculate_end_of_round_effects
+                        -- on G.hand before discarding, so blue seal / gold card effects
+                        -- need the cards to still be there.
                         WAR.UI.wait_for_enemy()
                     end
                     return true
@@ -710,6 +730,7 @@ function WAR.GAME.send_end_increments()
         ["Yellow Deck"]  = "yellow_deck", ["Green Deck"]   = "green_deck",
         ["Black Deck"]   = "black_deck",  ["Ghost Deck"]   = "ghost_deck",
         ["Painted Deck"] = "painted_deck",["Plasma Deck"]  = "plasma_deck",
+        ["Anaglyph Deck"]= "anaglyph_deck",
     }
     local dk = WAR.GAME.match_deck and DECK_KEYS[WAR.GAME.match_deck]
     if dk then WAR.NET.increment_achievement(dk, 1) end
@@ -738,6 +759,10 @@ WAR.calculate = function(self, context)
             if context.consumeable.config.center_key == 'c_sun' then
                 WAR.GAME.count('oneshot')
             end
+            -- Black Hole unlock condition
+            if context.consumeable.config.center_key == 'c_black_hole' then
+                check_for_unlock({ type = 'war_black_hole' })
+            end
         end
 
         if context.tag_added then
@@ -748,14 +773,89 @@ WAR.calculate = function(self, context)
         end
         
         if context.pseudorandom_result then
-            -- Oops unlock condition
-            -- Count pseudorandom "hits" during PvP hand scoring for the Oops achievement.
-            -- Only fires while in HAND_PLAYED state (the scoring phase) during a PvP round.
-            if context.result and G.STATE == G.STATES.HAND_PLAYED and WAR.GAME.pvp_round() then
-                WAR.GAME.prob_hits = WAR.GAME.prob_hits + 1
-                if WAR.GAME.prob_hits >= 25 then
-                    check_for_unlock({type = 'war_oops'})
+            -- Oops: probability rolls from mod jokers (vanilla rolls are caught
+            -- by the pseudorandom wrapper above).
+            if context.result then WAR.GAME.prob_hit() end
+        end
+
+        if context.discard and context.other_card then
+            -- Hit the Road: 50 discarded Jacks in a single match.
+            if context.other_card.base and context.other_card.base.value == 'Jack' then
+                WAR.GAME.jacks_discarded = (WAR.GAME.jacks_discarded or 0) + 1
+                if WAR.GAME.jacks_discarded >= 50 then
+                    check_for_unlock({ type = 'war_hit_the_road' })
                 end
+            end
+        end
+
+        if context.evaluate_poker_hand then
+            -- Supernova: one hand type 25 times in a single match. The same context
+            -- also runs to preview the hand while cards are being picked, so only
+            -- count it once the played cards have moved into G.play.
+            local hand = context.scoring_name
+            if hand and G.play and G.play.cards and #G.play.cards > 0 then
+                WAR.GAME.hand_counts = WAR.GAME.hand_counts or {}
+                local n = (WAR.GAME.hand_counts[hand] or 0) + 1
+                WAR.GAME.hand_counts[hand] = n
+                if n >= 25 then check_for_unlock({ type = 'war_supernova' }) end
+            end
+
+            -- Windows 7: 4OAK of 7s, all four suits present.
+            if not WAR.AVATAR.is_entitled('windows_7')
+               and context.scoring_name == 'Four of a Kind'
+               and G.play and G.play.cards then
+                local suits, seven_count = {}, 0
+                for _, card in ipairs(G.play.cards) do
+                    if card.base and card.base.value == '7' then
+                        seven_count = seven_count + 1
+                        local s = card.base.suit
+                        if s and s ~= 'Wild' then suits[s] = true end
+                    end
+                end
+                local suit_count = 0
+                for _ in pairs(suits) do suit_count = suit_count + 1 end
+                if seven_count >= 4 and suit_count >= 4 then
+                    check_for_unlock({ type = 'war_four_sevens' })
+                end
+            end
+
+            -- Jolly: every played hand has to contain a pair. Droll: every played
+            -- hand has to be a five-card flush. Both read the played cards here
+            -- because this is the only context that still has them in G.play.
+            local played = G.play and G.play.cards
+            if played and #played > 0 then
+                local ranks, has_pair = {}, false
+                for _, card in ipairs(played) do
+                    local r = card.base and card.base.value
+                    if r then
+                        ranks[r] = (ranks[r] or 0) + 1
+                        if ranks[r] >= 2 then has_pair = true end
+                    end
+                end
+                if not has_pair then WAR.GAME.jolly_valid = false end
+
+                local suit, is_flush = nil, (#played == 5)
+                if is_flush then
+                    for _, card in ipairs(played) do
+                        local s = card.base and card.base.suit
+                        if s and s ~= "Wild" then
+                            if not suit then suit = s
+                            elseif s ~= suit then is_flush = false end
+                        end
+                    end
+                end
+                if not is_flush then WAR.GAME.droll_valid = false end
+            end
+
+            -- Eyes: Photograph and Hanging Chad held at the same time.
+            if not WAR.AVATAR.is_entitled('eyes') and G.jokers and G.jokers.cards then
+                local photo, chad = false, false
+                for _, jkr in ipairs(G.jokers.cards) do
+                    local key = (jkr.config.center and jkr.config.center.key) or jkr.config.center_key
+                    if key == 'j_photograph' then photo = true end
+                    if key == 'j_hanging_chad' then chad = true end
+                end
+                if photo and chad then check_for_unlock({ type = 'war_eyes' }) end
             end
         end
 
@@ -763,6 +863,16 @@ WAR.calculate = function(self, context)
             -- Lucky unlock condition
             if context.other_card.lucky_trigger and not context.other_card.repetition_trigger then
                 WAR.GAME.count('lucky')
+            end
+
+            -- Hack: a rank 2-5 card retriggered, 20 times in a single match.
+            local hack_rank = context.other_card.base and context.other_card.base.value
+            if context.other_card.repetition_trigger
+               and (hack_rank == '2' or hack_rank == '3' or hack_rank == '4' or hack_rank == '5') then
+                WAR.GAME.hack_hits = (WAR.GAME.hack_hits or 0) + 1
+                if WAR.GAME.hack_hits >= 20 then
+                    check_for_unlock({ type = 'war_hack' })
+                end
             end
 
             -- Bloodstone unlock condition
@@ -790,6 +900,12 @@ WAR.calculate = function(self, context)
             if context.other_card.seal == 'Gold' then
                 WAR.GAME.count('gold_seal')
             end
+
+            -- Pizza: red or gold seal cards, counted once per card per hand.
+            if (context.other_card.seal == 'Red' or context.other_card.seal == 'Gold')
+               and not context.other_card.repetition_trigger then
+                WAR.GAME.count('pizza')
+            end
         end
 
         if context.individual and context.cardarea == G.hand then
@@ -808,4 +924,57 @@ WAR.calculate = function(self, context)
     end
 end
 
-print("[WAR] game_hooks loaded")
+-- Show banned keys as debuffed in the collection when a run with bans is active.
+function WAR.key_banned(key)
+    if not (WAR.GAME and WAR.GAME.active) then return false end
+    if not (key and G.GAME and G.GAME.banned_keys) then return false end
+    return G.GAME.banned_keys[key] and true or false
+end
+
+-- INIT_COLLECTION_CARD_ALERTS runs after every page flip in all five card
+-- collection tabs, so one hook here covers jokers, tarots, planets, spectrals,
+-- boosters and vouchers without duplicating logic per tab.
+local _orig_init_collection_alerts = INIT_COLLECTION_CARD_ALERTS
+function INIT_COLLECTION_CARD_ALERTS()
+    _orig_init_collection_alerts()
+    if not G.your_collection then return end
+    for j = 1, #G.your_collection do
+        for _, card in ipairs(G.your_collection[j].cards) do
+            if card.config and card.config.center
+               and WAR.key_banned(card.config.center.key) then
+                card:set_debuff(true)
+            end
+        end
+    end
+end
+
+-- Tags never reach that hook. The tag collection builds Tag objects whose art
+-- is a bare Sprite: nothing lands in G.your_collection and there is no
+-- set_debuff to call. Card:draw paints the debuff shader over its own finished
+-- center sprite, so do the same here, after the sprite's draw_steps.
+function WAR.debuff_sprite(sprite)
+    if not sprite or sprite.war_debuffed then return end
+    sprite.war_debuffed = true
+
+    local _orig_draw = sprite.draw
+    sprite.draw = function(self, overlay)
+        _orig_draw(self, overlay)
+        if not self.states.visible then return end
+        self.ARGS.send_to_shader = self.ARGS.send_to_shader or {}
+        self.ARGS.send_to_shader[1] = math.min(self.VT.r*3, 1) + G.TIMERS.REAL/28
+            + (self.juice and self.juice.r*20 or 0)
+        self.ARGS.send_to_shader[2] = G.TIMERS.REAL
+        self:draw_shader('debuff', nil, self.ARGS.send_to_shader)
+    end
+end
+
+if Tag and Tag.generate_UI then
+    local _orig_tag_generate_UI = Tag.generate_UI
+    function Tag:generate_UI(_size)
+        local node, sprite = _orig_tag_generate_UI(self, _size)
+        if WAR.key_banned(self.key) then WAR.debuff_sprite(sprite) end
+        return node, sprite
+    end
+end
+
+WAR.log("[WAR] game_hooks loaded")

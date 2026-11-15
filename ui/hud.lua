@@ -45,7 +45,6 @@ end
 -- in the bottom-right corner so the boss effect remains visible (including live
 -- updates when Luchador rerolls).
 
-WAR.UI.RIVAL_ICON = { badge_scale = 0.45, badge_dx = 0.53, badge_dy = 0.53 }
 WAR.UI._rival_icons = {}
 
 function WAR.UI.rival_icon_row()
@@ -54,18 +53,6 @@ function WAR.UI.rival_icon_row()
     local icon = WAR.AVATAR and WAR.AVATAR.icon(key)
     if not icon then return nil, nil end
     return icon.atlas or "war_icons_free", icon.row or 0
-end
-
--- Unlist a sprite from the animation/sprite registries by identity.
--- AnimatedSprite:remove() is buggy (removes last entry, not self).
-local function _unlist_sprite(spr)
-    if not spr then return end
-    spr.states.visible = false
-    for _, list in ipairs({ G.ANIMATIONS, G.I.SPRITE, G.MOVEABLES, G.I.MOVEABLE }) do
-        for i = #list, 1, -1 do
-            if list[i] == spr then table.remove(list, i) end
-        end
-    end
 end
 
 -- Resolve the boss blind sprite position. Works on select screen and in-run.
@@ -84,56 +71,21 @@ local function _boss_pos_for(chip)
     return chip and chip._war_orig_pos or {x=0, y=0}
 end
 
--- The boss a given chip belongs to: the live blind in-run, the upcoming boss on
--- the select screen (where G.GAME.blind still points at the previous one).
-local function _current_boss_pos(tag)
-    if tag == "select" then
-        local bk = G.GAME and G.GAME.round_resets and G.GAME.round_resets.blind_choices
-                   and G.GAME.round_resets.blind_choices.Boss
-        local def = bk and G.P_BLINDS and G.P_BLINDS[bk]
-        return def and def.pos
-    end
-    local b = G.GAME and G.GAME.blind and G.GAME.blind.config and G.GAME.blind.config.blind
-    return b and b.pos
-end
-
--- The chip sprite is drawn through draw_self in both places it shows up (UI
--- object nodes call it directly, Blind:draw calls draw_shader) and neither path
--- walks children, so the boss badge has to be drawn from inside the chip's own
--- draw. Pinning the badge to the chip's visible box also keeps it correct while
--- the chip floats and juices.
-local function _draw_boss_badge(chip, bb)
-    if not (bb and bb.states and bb.states.visible) then return end
-    if not (chip.VT and chip.VT.w) then return end
-    local cfg = WAR.UI.RIVAL_ICON
-    local w, h = chip.VT.w, chip.VT.h or chip.VT.w
-    local bw, bh = w * cfg.badge_scale, h * cfg.badge_scale
-    bb.VT.x, bb.VT.y = chip.VT.x + w * cfg.badge_dx, chip.VT.y + h * cfg.badge_dy
-    bb.VT.w, bb.VT.h = bw, bh
-    bb.VT.r, bb.T.r  = 0, 0
-    bb.T.x, bb.T.y   = bb.VT.x, bb.VT.y
-    bb.T.w, bb.T.h   = bw, bh
-    bb.offset_seconds = chip.offset_seconds
-    bb:draw_shader("dissolve")
-end
-
-local function _chip_draw_self(self)
-    local orig = self._war_orig_draw_self
-    if orig then orig(self) end
-    local entry = self._war_badge_entry
-    if entry then _draw_boss_badge(self, entry.boss_badge) end
-end
+-- The chip sprite is drawn through two different paths:
+--   select screen: UIElement:draw_self calls config.object:draw(), which on a
+--     sprite with draw_steps set skips draw_self entirely.
+--   in-run HUD:    Blind:draw() calls animatedSprite:draw_shader() -> draw_self.
+-- In both cases the mini_blind UIBox badge (created by the Lovely patches in
+-- ui.toml) is a child of the chip/Blind and drawn automatically. The only job
+-- here is pfp atlas enforcement via sync_rival_icons so vanilla set_sprite_pos
+-- calls mid-animation don't stomp the icon.
 
 function WAR.UI.drop_rival_icon(entry)
     local p = entry and entry.parent
     if not p then return end
-    if p._war_orig_draw_self then
-        p.draw_self = p._war_orig_draw_self
-        p._war_orig_draw_self = nil
-    end
+    WAR.log(("[WAR ICON] drop tag=%s tracked=%d"):format(
+        tostring(entry.tag), #WAR.UI._rival_icons))
     p._war_badge_entry = nil
-    local bb = entry.boss_badge
-    if bb then _unlist_sprite(bb) end
     if p._war_orig_atlas then
         p.atlas = p._war_orig_atlas
         if p._war_orig_scale then
@@ -163,10 +115,14 @@ function WAR.UI.attach_rival_icon(parent, tag)
 
     local atlas_key, row = WAR.UI.rival_icon_row()
     local icons_atlas = atlas_key and G.ANIMATION_ATLAS and G.ANIMATION_ATLAS[atlas_key]
-    local blind_atlas = G.ANIMATION_ATLAS and G.ANIMATION_ATLAS["blind_chips"]
     if not (icons_atlas and row ~= nil) then return end
 
-    parent._war_orig_atlas = parent.atlas
+    -- The Lovely blind.lua patch may have already swapped the chip to the pfp
+    -- atlas. Save blind_chips as the original so drop_rival_icon restores it
+    -- correctly on defeat. For the select screen the chip still has blind_chips
+    -- at this point (the Lovely patch only handles UI_definitions.lua).
+    local blind_chips_atlas = G.ANIMATION_ATLAS and G.ANIMATION_ATLAS["blind_chips"]
+    parent._war_orig_atlas = (parent.atlas == icons_atlas and blind_chips_atlas) or parent.atlas
     parent._war_orig_pos   = _boss_pos_for(parent)
     parent._war_orig_scale = { x = parent.scale.x, y = parent.scale.y }
 
@@ -180,41 +136,18 @@ function WAR.UI.attach_rival_icon(parent, tag)
     parent.scale.y = apy
     parent:set_sprite_pos({x=0, y=row})
 
-    -- Create boss badge sprite — drawn by the chip's draw_self override above.
-    local boss_spr = nil
-    if blind_atlas then
-        local bp  = _current_boss_pos(tag) or parent._war_orig_pos or {x=0, y=0}
-        local bsz = (parent.T.w or 1) * WAR.UI.RIVAL_ICON.badge_scale
-        local ok, spr = pcall(AnimatedSprite, 0, 0, bsz, bsz, blind_atlas, bp)
-        if ok and spr then
-            spr:define_draw_steps({
-                {shader="dissolve", shadow_height=0.05},
-                {shader="dissolve"},
-            })
-            spr.states.drag.can    = false
-            spr.states.collide.can = false
-            spr.states.hover.can   = false
-            spr.states.visible     = true
-            spr.float              = false   -- prevent the blind chip's floating rotation
-            spr.T.r                = 0
-            spr._war_boss_pos = {x=bp.x, y=bp.y}
-            boss_spr = spr
-        end
-    end
-
     local entry = {
-        parent     = parent,
-        boss_badge = boss_spr,
-        tag        = tag,
-        pfp_atlas  = icons_atlas,
-        pfp_row    = row,
-        pfp_scale  = { x = apx, y = apy },
+        parent    = parent,
+        tag       = tag,
+        pfp_atlas = icons_atlas,
+        pfp_row   = row,
+        pfp_scale = { x = apx, y = apy },
     }
     WAR.UI._rival_icons[#WAR.UI._rival_icons + 1] = entry
+    WAR.log(("[WAR ICON] attach tag=%s tracked=%d"):format(
+        tostring(tag), #WAR.UI._rival_icons))
 
-    parent._war_badge_entry    = entry
-    parent._war_orig_draw_self = parent.draw_self
-    parent.draw_self           = _chip_draw_self
+    parent._war_badge_entry = entry
 
     WAR.UI.sync_rival_icons()
 end
@@ -242,45 +175,14 @@ function WAR.UI.sync_rival_icons()
             elseif not p.animation or p.animation.x ~= 0 or p.animation.y ~= (e.pfp_row or 0) then
                 p:set_sprite_pos({x = 0, y = e.pfp_row or 0})
             end
-            -- Luchador reroll: move the badge onto the new boss as soon as it lands.
-            local bb = e.boss_badge
-            local bp = bb and _current_boss_pos(e.tag)
-            if bp then
-                local old = bb._war_boss_pos
-                if not old or bp.x ~= old.x or bp.y ~= old.y then
-                    bb:set_sprite_pos(bp)
-                    bb._war_boss_pos = {x = bp.x, y = bp.y}
-                end
-            end
         end
     end
 end
 
--- Apply rival chip treatment to the boss choice on the blind-select screen.
-local _orig_blind_choice = create_UIBox_blind_choice
-create_UIBox_blind_choice = function(type, run_info)
-    local def = _orig_blind_choice(type, run_info)
-    if run_info or type ~= "Boss" or not WAR.GAME.active then return def end
-    if not WAR.is_rival_blind(G.P_BLINDS[G.GAME.round_resets.blind_choices.Boss]) then
-        return def
-    end
-
-    local function find_chip(node)
-        if _G.type(node) ~= "table" then return nil end
-        if node.n == G.UIT.O and node.config and node.config.object
-           and node.config.object.animation then
-            return node.config.object
-        end
-        for _, child in ipairs(node.nodes or {}) do
-            local hit = find_chip(child)
-            if hit then return hit end
-        end
-    end
-
-    local chip = find_chip(def)
-    if chip then WAR.UI.attach_rival_icon(chip, "select") end
-    return def
-end
+-- The Lovely patches in ui.toml handle the select-screen pfp swap and mini_blind
+-- badge directly. No Lua hook needed here: G.blind_select is nil when
+-- create_UIBox_blind_choice runs (the UIBox is assigned afterwards), so calling
+-- attach_rival_icon here would be immediately undone by sync_rival_icons.
 
 -- Per-frame func on HUD_blind_count: advances the count-up ease and updates text/scale.
 G.FUNCS.war_blind_chip_scale = function(e)
@@ -578,13 +480,15 @@ G.FUNCS.war_timer_toggle = function(e)
     WAR.NET.send({ action = t.paused and "resumeTimer" or "pauseTimer" })
 end
 
-print("[WAR] ui/hud loaded")
+WAR.log("[WAR] ui/hud loaded")
 
 -- If the blind is a PVP blind, set the name of the blind to the opponent's name
-local set_text_hook = Blind.set_text
-function Blind:set_text()
-    set_text_hook(self)
-    if self.config.blind and WAR.is_rival_blind(self.config.blind) then
-        self.loc_name = WAR.LOBBY.is_host and WAR.LOBBY.guest_name or WAR.LOBBY.host_name
+if Blind then
+    local set_text_hook = Blind.set_text
+    function Blind:set_text()
+        set_text_hook(self)
+        if self.config.blind and WAR.is_rival_blind(self.config.blind) then
+            self.loc_name = WAR.LOBBY.is_host and WAR.LOBBY.guest_name or WAR.LOBBY.host_name
+        end
     end
 end

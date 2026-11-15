@@ -125,7 +125,7 @@ function WAR.UI.update_deck_info()
 end
 
 function WAR.UI.on_lobby_created(code)
-    print("[WAR UI] on_lobby_created code=" .. tostring(code))
+    WAR.log("[WAR UI] on_lobby_created code=" .. tostring(code))
     WAR.LOBBY.host_name   = WAR.SYNC.my_username()
     WAR.LOBBY.guest_name  = nil
     WAR.LOBBY.ready       = false
@@ -139,7 +139,7 @@ function WAR.UI.on_lobby_created(code)
         func = function()
             if G.OVERLAY_MENU then G.FUNCS.exit_overlay_menu() end
             local ok, err = pcall(WAR.UI.show_lobby, G.UIDEF.war_lobby_bar())
-            if not ok then print("[WAR UI] show_lobby error: " .. tostring(err)) end
+            if not ok then WAR.log("[WAR UI] show_lobby error: " .. tostring(err)) end
             return true
         end,
     }))
@@ -168,7 +168,7 @@ function WAR.UI.on_joined_as_guest(host_username, code)
         func = function()
             if G.OVERLAY_MENU then G.FUNCS.exit_overlay_menu() end
             local ok, err = pcall(WAR.UI.show_lobby, G.UIDEF.war_lobby_bar())
-            if not ok then print("[WAR UI] show_lobby (guest) error: " .. tostring(err)) end
+            if not ok then WAR.log("[WAR UI] show_lobby (guest) error: " .. tostring(err)) end
             return true
         end,
     }))
@@ -760,6 +760,7 @@ G.FUNCS.exit_overlay_menu = function(e)
     end
     WAR._deck_selecting     = false
     WAR._deck_select_return = nil
+    if WAR.UI.clear_icon_tips then WAR.UI.clear_icon_tips() end
     _orig_exit_overlay(e)
 end
 
@@ -836,14 +837,19 @@ end
 
 -- Restore previously selected deck/stake/seed before opening setup_run.
 local function war_restore_deck_state()
-    if WAR.LOBBY.config.back then
-        pcall(function()
-            G.GAME.viewed_back = Back(get_deck_from_name(WAR.LOBBY.config.back))
-        end)
-    end
-    if WAR.LOBBY.config.stake then
-        G.viewed_stake = WAR.LOBBY.config.stake
-        pcall(function() G.FUNCS.change_stake({to_key = G.viewed_stake}) end)
+    -- The run-select screen keeps whatever the last run used, so a lobby with
+    -- nothing picked has to be pushed back to the vanilla defaults or the stale
+    -- deck/sleeve/stake come along into the next lobby and into the run.
+    local back_name = WAR.LOBBY.config.back or "Red Deck"
+    pcall(function()
+        G.GAME.viewed_back = Back(get_deck_from_name(back_name))
+    end)
+    local stake = tonumber(WAR.LOBBY.config.stake) or 1
+    G.viewed_stake = stake
+    pcall(function() G.FUNCS.change_stake({to_key = stake}) end)
+    -- CardSleeves reads G.viewed_sleeve when the run is confirmed.
+    if WAR.COMPAT and WAR.COMPAT.sleeve_sprite then
+        G.viewed_sleeve = WAR.LOBBY.config.sleeve or "sleeve_casl_none"
     end
     -- Restore seed into SMODS run selector
     if SMODS and SMODS.RunSelect and SMODS.RunSelect.Setup then
@@ -1213,7 +1219,7 @@ function WAR.UI.create_lobby_panels()
 
     -- Debug: log title_top position so we can derive the correct offsets.
     if G.title_top then
-        print("[WAR] title_top T x=" .. tostring(G.title_top.T.x)
+        WAR.log("[WAR] title_top T x=" .. tostring(G.title_top.T.x)
               .. " y=" .. tostring(G.title_top.T.y)
               .. " w=" .. tostring(G.title_top.T.w)
               .. " h=" .. tostring(G.title_top.T.h))
@@ -1393,7 +1399,7 @@ local function war_try_reconnect()
 
     WAR.LOBBY._reconnect_attempts = (WAR.LOBBY._reconnect_attempts or 0) + 1
     if WAR.LOBBY._reconnect_attempts > WAR_MAX_RECONNECT then
-        print("[WAR] Auto-reconnect: max attempts reached, giving up")
+        WAR.log("[WAR] Auto-reconnect: max attempts reached, giving up")
         WAR.LOBBY._reconnect_code     = nil
         WAR.LOBBY._reconnect_attempts = 0
         WAR.LOBBY._reconnect_is_host  = false
@@ -1402,7 +1408,7 @@ local function war_try_reconnect()
 
     local code    = WAR.LOBBY._reconnect_code
     local is_host = WAR.LOBBY._reconnect_is_host
-    print("[WAR] Auto-reconnect attempt " .. WAR.LOBBY._reconnect_attempts
+    WAR.log("[WAR] Auto-reconnect attempt " .. WAR.LOBBY._reconnect_attempts
           .. "/" .. WAR_MAX_RECONNECT .. " code=" .. code
           .. " host=" .. tostring(is_host))
 
@@ -1430,7 +1436,7 @@ local function war_try_reconnect()
         else
             local jok, jerr = WAR.LOBBY.join(code)
             if not jok then
-                print("[WAR] Auto-reconnect join failed: " .. tostring(jerr))
+                WAR.log("[WAR] Auto-reconnect join failed: " .. tostring(jerr))
                 G.E_MANAGER:add_event(Event({
                     trigger="after", delay=WAR_RECONNECT_DELAY, timer="REAL", blockable=false,
                     func=function() war_try_reconnect(); return true end,
@@ -1471,10 +1477,18 @@ local function _war_cs_state()
     return localize('war_cs_offline'), G.C.WHITE
 end
 
+-- "[War] V0.2.2 (Connected)" — the version comes from the mod metadata, so a
+-- release bump alone changes the label.
+local function _war_cs_label(status)
+    return string.format(localize('war_cs_label'), WAR.mod_version(), status)
+end
+
 function WAR.UI.update_connection_status()
     if G.HUD_war_connection then G.HUD_war_connection:remove(); G.HUD_war_connection = nil end
     if not (G.STAGE and G.STAGE == G.STAGES.MAIN_MENU) then return end
     local text, col = _war_cs_state()
+    text = _war_cs_label(text)
+    WAR.log("[WAR UI] main menu label: " .. text)
     G.HUD_war_connection = UIBox({
         definition = {
             n = G.UIT.ROOT,
@@ -1491,7 +1505,7 @@ function WAR.UI.update_connection_status()
         config = {
             align  = "tri",
             bond   = "Glued",
-            offset = { x = 0, y = 0.9 },
+            offset = { x = 0, y = 1.0 },
             major  = G.ROOM_ATTACH,
         },
     })
@@ -1513,4 +1527,4 @@ function WAR.UI.hide_lobby()
     WAR.UI.update_connection_status()
 end
 
-print("[WAR] ui/lobby loaded")
+WAR.log("[WAR] ui/lobby loaded")

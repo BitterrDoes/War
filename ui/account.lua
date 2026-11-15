@@ -3,6 +3,7 @@
 
 -- Return to the War config page (used as back_func on screens opened from it).
 function G.FUNCS.war_back_to_config(e)
+    if WAR.UI.clear_icon_tips then WAR.UI.clear_icon_tips() end
     local mod = SMODS.Mods and SMODS.Mods["War"]
     if create_UIBox_mods and mod then
         G.ACTIVE_MOD_UI = mod
@@ -167,4 +168,4 @@ function G.FUNCS.war_do_logout(e)
     end)
 end
 
-print("[WAR] ui/account loaded")
+WAR.log("[WAR] ui/account loaded")
