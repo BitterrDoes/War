@@ -327,6 +327,9 @@ return {
 
             -- Account screens
             war_account_label         = "Account: ",
+            war_signed_in_as          = "Signed in as",
+            war_not_logged_in         = "Not logged in!",
+            war_guest_display_name    = "Guest Player",
             war_manage_account        = "Manage Account",
             war_current_account       = "Current: ",
             war_log_in                = "Log In",
@@ -341,6 +344,11 @@ return {
             war_yes_log_out           = "Yes",
             war_no_stay               = "No",
             war_none                  = "None",
+            war_wins                  = "Wins",
+            war_losses                = "Losses",
+            war_win_percent           = "Win %",
+            war_click_to              = "Click to",
+            war_customize             = "Customize",
 
             -- Mod config screens
             war_icon                  = "Icon",

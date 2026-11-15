@@ -132,7 +132,8 @@ WAR.ICONS = {
     { key = "vagabond",        atlas = "war_icons_special",      row = 19, special = true },
 }
 
-WAR.AVATAR.selected = "jimbo"
+WAR.AVATAR.DEFAULT  = "jimbo"
+WAR.AVATAR.selected = WAR.AVATAR.DEFAULT
 
 -- Lookup index, built once from the ordered table so callers don't rescan it.
 WAR.ICONS_BY_KEY = {}

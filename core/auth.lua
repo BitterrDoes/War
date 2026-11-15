@@ -7,6 +7,7 @@ WAR.AUTH = {
     token    = nil,
     state    = "idle", -- idle | connecting | registering | logging_in | logged_in | guest
     on_done  = nil,   -- callback(ok, err)
+    newly_logged_in = false -- used to tell whether logging in is from previously existing session or not
 }
 
 local SESSION_FILE = "War_session.dat"
@@ -130,6 +131,9 @@ function WAR.AUTH.clear_session()
     WAR.AUTH.user   = nil
     WAR.AUTH.token  = nil
     WAR.AUTH.state  = "idle"
+    
+    WAR.AVATAR.selected = WAR.AVATAR.DEFAULT
+    WAR.config.icon = WAR.AVATAR.selected
 end
 
 function WAR.AUTH.handle(msg)
@@ -179,6 +183,7 @@ function WAR.AUTH.handle(msg)
             WAR.ACH_PROGRESS = msg.counters
             WAR.ACH_PROGRESS_READY = true
         end
+        if WAR.AUTH._pending_new_login then WAR.AUTH.newly_logged_in = true; WAR.AUTH._pending_new_login = false end
         if WAR.AUTH.on_done then WAR.AUTH.on_done(true, nil) end
 
     elseif a == "logged_out" then
@@ -230,12 +235,16 @@ function WAR.AUTH.login(username, password, cb)
     if not ok then cb(false, err); return end
     -- first fetch salt, then server sends back salt -> handle() computes verifier
     WAR.NET.send({ action = "get_salt", username = username })
+    WAR.AUTH._pending_new_login = true
 end
 
 function WAR.AUTH.guest()
     WAR.AUTH.state = "guest"
     WAR.AUTH.user  = "Guest"
     WAR.AUTH.token = nil
+
+    WAR.AVATAR.selected = WAR.AVATAR.DEFAULT
+    WAR.config.icon = WAR.AVATAR.selected
 end
 
 function WAR.AUTH.logout(cb)

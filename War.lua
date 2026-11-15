@@ -68,4 +68,9 @@ WAR.load("ui/hud.lua")
 WAR.load("ui/popups.lua")
 WAR.load("ui/lobby.lua")
 
+-- TEMPORARY
+WAR.load("ui/temp/avatar.lua")
+WAR.load("ui/temp/config.lua")
+WAR.load("ui/temp/account.lua")
+
 WAR.load_dir("compat")
