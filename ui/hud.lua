@@ -156,8 +156,18 @@ function WAR.UI.sync_rival_icons()
     for i = #WAR.UI._rival_icons, 1, -1 do
         local e = WAR.UI._rival_icons[i]
         local p = e.parent
-        local alive = p and p.states and p.states.visible ~= false
-                      and not (e.tag == "select" and not G.blind_select)
+        -- "blind" entries must survive while the chip is transitioning in:
+        -- Blind:init starts with states.visible = false (animated in later), so
+        -- the visible check would immediately drop the entry and restore the
+        -- vanilla boss sprite. Keep them alive via pvp_round(); Blind:defeat
+        -- calls clear_rival_icon explicitly when the round actually ends.
+        local alive
+        if e.tag == "blind" then
+            alive = p and WAR.GAME.pvp_round()
+        else
+            alive = p and p.states and p.states.visible ~= false
+                    and not (e.tag == "select" and not G.blind_select)
+        end
         if not alive then
             WAR.UI.drop_rival_icon(e)
             table.remove(WAR.UI._rival_icons, i)
