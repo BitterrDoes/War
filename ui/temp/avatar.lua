@@ -42,10 +42,11 @@ WAR.UI.create_dummy_avatar = function(_icon, _is_config)
                 if dummy_chip.children.alert then 
                     dummy_chip.children.alert:remove(); 
                     dummy_chip.children.alert = nil;
-                    WAR.AVATAR.tick_flag = true
                 end
             end
         end
+
+        WAR.AVATAR.tick_flag = true
     end
     
     dummy_chip.stop_hover = function() 
@@ -89,7 +90,7 @@ WAR.UI.create_dummy_avatar = function(_icon, _is_config)
             }))
         end
 
-        if (WAR.AUTH.state == "idle" or WAR.AUTH.newly_logged_in) or WAR.AUTH.state == "guest" and WAR.AVATAR.selected == WAR.AVATAR.DEFAULT and not WAR.AVATAR.tick_flag then
+        if (((WAR.AUTH.state == "logged_in" ) and WAR.AUTH.newly_logged_in) or WAR.AUTH.state == "guest") and WAR.AVATAR.selected == WAR.AVATAR.DEFAULT and not WAR.AVATAR.tick_flag then
             G.E_MANAGER:add_event(Event({
                 trigger = 'immediate',
                 func = (function()
