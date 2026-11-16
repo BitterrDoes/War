@@ -126,6 +126,19 @@ match_indent = true
 payload      = "restart = not (WAR and WAR.GAME and WAR.GAME.active) and UIBox_button{id = 'restart_button', label = {localize('b_start_new_run')}, button = \"setup_run\", minw = 5} or nil"
 times        = 1
 
+# When a deck starts with a specific consumable (e.g. Ghost Deck → c_hex) and
+# that consumable is banned, create_card falls back to the _type argument which
+# vanilla hard-codes as 'Tarot'. Instead use the actual set of the banned card
+# so Ghost Deck gives a random Spectral (not Tarot) when Hex is banned.
+[[patches]]
+[patches.pattern]
+target       = "back.lua"
+pattern      = "local card = create_card('Tarot', G.consumeables, nil, nil, nil, nil, v, 'deck')"
+position     = "at"
+match_indent = true
+payload      = "local card = create_card((G.P_CENTERS[v] and G.GAME and G.GAME.banned_keys and G.GAME.banned_keys[v]) and G.P_CENTERS[v].set or 'Tarot', G.consumeables, nil, nil, nil, nil, v, 'deck')"
+times        = 1
+
 # In the tag collection, apply the debuff shader on top of any tag that is
 # banned for the current run (weeworld and any ruleset using banned_keys).
 [[patches]]

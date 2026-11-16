@@ -27,7 +27,7 @@ ACHIEVEMENT_ICONS = {
     'black_stake', 'purple_stake', 'orange_stake', 'gold_stake', 'jimbo_stake',
     'red_deck', 'blue_deck', 'yellow_deck', 'green_deck', 'black_deck',
     'ghost_deck', 'painted_deck', 'plasma_deck', 'red_seal', 'blue_seal',
-    'gold_seal', 'purple_seal', 'eyes', 'hack', 'hit_the_road', 'supernova',
+    'gold_seal', 'ultrakill_v1', 'purple_seal', 'eyes', 'hack', 'hit_the_road', 'supernova',
     'anaglyph_deck', 'black_hole', 'canio', 'chicot', 'perkeo', 'tribuolet',
     'yorick', 'windows_7',
 }

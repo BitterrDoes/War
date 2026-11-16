@@ -110,6 +110,7 @@ WAR.ICONS = {
     { key = "tribuolet",       atlas = "war_icons_achievement",  row = 52, achieve = function(self, args) if args.type == 'war_win' then return WAR.GAME.won_with_legendary("tribuolet") end end },
     { key = "yorick",          atlas = "war_icons_achievement",  row = 53, achieve = function(self, args) if args.type == 'war_win' then return WAR.GAME.won_with_legendary("yorick") end end },
     { key = "windows_7",      atlas = "war_icons_achievement",  row = 54, achieve = function(self, args) if args.type == 'war_four_sevens' then return true end end },
+    { key = "ultrakill_v1",    atlas = "war_icons_achievement",  row = 55, achieve = "ultrakill_v1" },
     { key = "bean",            atlas = "war_icons_special",      row = 0,  special = true },
     { key = "zaino",           atlas = "war_icons_special",      row = 1,  special = true },
     { key = "doc",             atlas = "war_icons_special",      row = 2,  special = true },

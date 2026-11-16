@@ -303,6 +303,12 @@ function WAR.SYNC.on_start_game(m)
     WAR.GAME.end_pvp_pending = false
     WAR.GAME.enemy_masked    = false
     WAR.MODCOMPAT._state  = {}
+    -- Clear any stale end-screen state from the previous match. Without this,
+    -- refresh_end_screen fires when enemyStats arrives and re-shows the old screen.
+    WAR.GAME._end_screen      = nil
+    WAR.GAME._end_won         = nil
+    WAR.GAME._stats_refreshed = nil
+    WAR.GAME._my_board_snapshot = nil
 
     if m.lives     then WAR.LOBBY.config.lives     = tonumber(m.lives) end
     if m.seed      then WAR.LOBBY.config.seed      = m.seed end
@@ -477,10 +483,16 @@ function WAR.SYNC.on_game_over(i_won)
         if i_won then WAR.UI.show_win_game() else WAR.UI.show_lose_game() end
     end
     -- Give the relay a beat to bring the opponent's board in before painting it.
+    -- Guard: if a new game started before the delay fires, skip the stale show.
     if G.E_MANAGER and Event then
         G.E_MANAGER:add_event(Event({
             trigger = "after", delay = 0.35, blockable = false,
-            func = function() show(); return true end,
+            func = function()
+                if not WAR.GAME.active and WAR.GAME._end_screen ~= nil then
+                    show()
+                end
+                return true
+            end,
         }))
     else
         show()
