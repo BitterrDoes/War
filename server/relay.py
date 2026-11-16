@@ -95,6 +95,7 @@ ACHIEVEMENTS = {
     'red_seal':      _ach(threshold=100),
     'blue_seal':     _ach(threshold=100),
     'gold_seal':     _ach(threshold=100),
+    'ultrakill_v1':  _ach(threshold=250),
     'purple_seal':   _ach(threshold=100),
     'eyes':          _ach(),
     'hack':          _ach(),

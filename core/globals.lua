@@ -229,7 +229,7 @@ end
 WAR.ACH_COUNTERS = {
     "oneshot", "bloodstone", "pizza", "osage", "stone",
     "wild", "mult", "gold", "steel", "lucky",
-    "blue_seal", "gold_seal", "purple_seal", "red_seal",
+    "blue_seal", "gold_seal", "ultrakill_v1", "purple_seal", "red_seal",
 }
 
 -- Version string for the main-menu status line. `WAR.version` is SMODS' own

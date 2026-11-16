@@ -105,6 +105,7 @@ return {
             war_icon_red_seal         = { name = "Red Seal", text = { "Trigger the Red Seal 100 times" } }, -- having it retrigger a card 100 times
             war_icon_blue_seal        = { name = "Blue Seal", text = { "Trigger the Blue Seal 100 times" } }, -- getting a planet from it 100 times
             war_icon_gold_seal        = { name = "Gold Seal", text = { "Trigger the Gold Seal 100 times" } }, -- getting the money from it 100 times
+            war_icon_ultrakill_v1     = { name = "Ultrakill V1", text = { "Score 250 gold seal cards" } },
             war_icon_purple_seal      = { name = "Purple Seal", text = { "Trigger the Purple Seal 100 times" } }, -- getting the tarot from one 100 times
             war_icon_eyes             = { name = "Eyes", text = { ">looks inside" } }, -- have both photograph and hanging chad at the same time waow
             war_icon_hack             = { name = "Hack", text = { "Retrigger a card ranks 2-5 20 times in a single match" } },
@@ -184,6 +185,13 @@ return {
             war_rs_weeworld_desc   = {
                 "Removes majority of all",
                 "Jokers, Consumables, Booster Packs and Tags"
+            },
+
+            -- Ruleset: Packaged
+            war_rs_packaged_name   = "Packaged",
+            war_rs_packaged_desc   = {
+                "Shop items become packs of their matching type.",
+                "Vouchers are unaffected.",
             },
 
             -- Lobby bar buttons
