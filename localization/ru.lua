@@ -184,6 +184,12 @@ return {
             war_rs_weeworld_desc   = {
                 "Убирает большинство Джокеров,",
                 "Расходников, Бустерных Наборов и Тэгов"
+
+            -- Ruleset: Packaged
+            war_rs_packaged_name   = "Упакованный",
+            war_rs_packaged_desc   = {
+                "Предметы магазина становятся Наборами их типа.",
+                "Это не затрагивает купоны.",
             },
 
             -- Lobby bar buttons
