@@ -160,6 +160,12 @@ function Game:start_run(start_params)
                 G.GAME.round_resets.blind_tags.Big = get_next_tag_key()
             end
         end
+        -- Same issue: the first ante's voucher is pre-picked inside _orig_start_run
+        -- before banned_keys is populated. get_current_pool already filters banned
+        -- items, so a fresh call returns a non-banned voucher.
+        if G.GAME.current_round and G.GAME.banned_keys[G.GAME.current_round.voucher] then
+            G.GAME.current_round.voucher = get_next_voucher_key()
+        end
     end
     if WAR.GAME.active and WAR.UI.setup_lives_hud then
         G.E_MANAGER:add_event(Event({
