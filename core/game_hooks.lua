@@ -195,21 +195,25 @@ end
 -- Try .number, then :to_number(), then the printed form.
 function WAR.GAME.my_chips()
     local raw = G.GAME and G.GAME.chips
-    -- tonumber handles plain numbers and LuaJIT FFI cdata (Amulet BigNum).
+    -- tonumber handles plain numbers directly.
     local n = tonumber(raw)
     if n then return n end
-    -- Lua-table BigNum (other mods): try .number, :to_number(), then tostring.
-    if type(raw) == "table" then
-        if type(raw.number) == "number" then return raw.number end
-        if type(raw.to_number) == "function" then
-            local ok, v = pcall(raw.to_number, raw)
-            if ok and type(v) == "number" then return v end
-        end
+    -- BigNum: may be a Lua table (other mods, or Amulet with enable_compat=true)
+    -- or an FFI cdata struct (Amulet OmegaNum with enable_compat=false, type()=="cdata").
+    -- Access .number via pcall so the same path covers both without a type-check branch.
+    if raw ~= nil then
+        local ok, v = pcall(function() return raw.number end)
+        if ok and type(v) == "number" and v == v then return v end   -- v==v: skip NaN
+        ok, v = pcall(function() return raw:to_number() end)
+        if ok and type(v) == "number" and v == v then return v end
     end
     return tonumber((tostring(raw):gsub(",", ""):gsub("%s", ""))) or 0
 end
 
 function WAR.GAME.send_hand_state(score, hands)
+    -- Capture raw chips BEFORE settle_chips converts a BigNum to a plain float
+    -- (which would lose the actual exponent, e.g. 800 for 10^800).
+    local raw_chips = (score == nil) and (G.GAME and G.GAME.chips) or nil
     if not score then WAR.GAME.settle_chips() end
     -- Jolly and Droll are judged in the evaluate_poker_hand context instead: by
     -- the time this runs the played cards have already left G.play.
@@ -235,6 +239,7 @@ function WAR.GAME.send_hand_state(score, hands)
     WAR.NET.send({
         action    = "playHand",
         score     = WAR.SCORE.encode(out_score),
+        log_score = string.format("%.17g", WAR.SCORE.log10_of(raw_chips ~= nil and raw_chips or out_score)),
         handsLeft = out_hands,
         skips     = (G.GAME and G.GAME.skips) or 0,
     })
@@ -303,9 +308,21 @@ function WAR.GAME.settle_chips()
                 local e    = queue[i]
                 local ease = e and e.ease
                 if ease and ease.ref_table == G.GAME and ease.ref_value == "chips" then
-                    local target = math.floor(
-                        tonumber(ease.end_val)
-                        or tonumber((tostring(ease.end_val):gsub(",",""):gsub("%s","")))
+                    local ev = ease.end_val
+                    local target = tonumber(ev)
+                    if not target and ev ~= nil then
+                        -- BigNum (table or cdata): try .number, then :to_number(), then tostring.
+                        local ok, v = pcall(function() return ev.number end)
+                        if ok and type(v) == "number" and v == v then
+                            target = v
+                        else
+                            ok, v = pcall(function() return ev:to_number() end)
+                            if ok and type(v) == "number" and v == v then target = v end
+                        end
+                    end
+                    target = math.floor(
+                        target
+                        or tonumber((tostring(ev):gsub(",",""):gsub("%s","")))
                         or WAR.GAME.my_chips()
                     )
                     G.GAME.chips   = target
@@ -415,8 +432,12 @@ function Game:update_selecting_hand(dt)
         if not WAR.GAME._blind_chips_target and G.GAME and G.GAME.blind then
             local c = G.GAME.blind.chips
             local n = tonumber(c)
-                   or tonumber((tostring(c):gsub(",", ""):gsub("%s", "")))
-            if type(n) == "number" and n > 0 then
+            if not n and c ~= nil then
+                local ok, v = pcall(function() return c.number end)
+                if ok and type(v) == "number" and v == v then n = v end
+            end
+            n = n or tonumber((tostring(c):gsub(",", ""):gsub("%s", "")))
+            if type(n) == "number" and n > 0 and n < math.huge then
                 WAR.GAME._blind_chips_target = n
             end
         end

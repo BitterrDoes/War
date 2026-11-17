@@ -302,15 +302,11 @@ end
 function G.FUNCS.war_open_icon_select()
     -- Configuration for icon select pages
     WAR.ICON_SELECT = WAR.ICON_SELECT or {}
-    WAR.ICON_SELECT.config = WAR.ICON_SELECT.config or {
-        page_options = { "Free", "Special", "Achievement" },
-        viewing_type = 1,
-        icon_page = 1
-    }
+    WAR.ICON_SELECT.config = WAR.ICON_SELECT.config or {}
 
     WAR.ICON_SELECT.config.viewing_type = 1
     WAR.ICON_SELECT.config.icon_page = 1
-    WAR.ICON_SELECT.page_text = "Page 1"
+    WAR.ICON_SELECT.page_text = "1/1"
     WAR.ICON_SELECT.current_icon_name = WAR.AVATAR.name(WAR.AVATAR.DEFAULT)
     WAR.ICON_SELECT.current_icon_description = ""
 
@@ -326,6 +322,15 @@ function G.FUNCS.war_open_icon_select()
         end
     end
 
+    -- Build the tab list fresh each open: Special is only shown when the
+    -- account actually has at least one special icon.
+    local page_options = { "Free" }
+    if #special_list > 0 then
+        page_options[#page_options+1] = "Special"
+    end
+    page_options[#page_options+1] = "Achievement"
+    WAR.ICON_SELECT.config.page_options = page_options
+
     WAR.ICON_SELECT.icon_cache = {}
     WAR.ICON_SELECT.icon_cache.free = free_list;
     WAR.ICON_SELECT.icon_cache.achievement = ach_list;
@@ -340,12 +345,13 @@ function G.FUNCS.war_open_icon_select()
     local viewing_type = string.lower(WAR.ICON_SELECT.config.page_options[WAR.ICON_SELECT.config.viewing_type])
     local rows, columns = WAR.ICON_SELECT.rows, WAR.ICON_SELECT.columns
     local current_page_options = {}
-    local page_limit = math.ceil((#WAR.ICON_SELECT.icon_cache[viewing_type])/(rows*columns))
+    local page_limit = math.max(1, math.ceil((#WAR.ICON_SELECT.icon_cache[viewing_type])/(rows*columns)))
     for i = 1, page_limit do
         current_page_options[#current_page_options+1] = localize("war_page") .. " " .. i
     end
 
     WAR.ICON_SELECT.page_options = current_page_options
+    WAR.ICON_SELECT.page_total   = page_limit
 
     G.your_collection = {}
 	local deck_tables = {}
@@ -437,17 +443,20 @@ function G.FUNCS.war_open_icon_select()
         n = G.UIT.R,
         config = { minw = 9.6, minh = 0.5, r = 0.1, padding = 0.1, colour = G.C.BLACK, align = "cm" },
         nodes = {
-            create_option_cycle({
-                options = WAR.ICON_SELECT.config.page_options,
-                w = 4.5,
-                cycle_shoulders = true,
-                opt_callback = 'war_icon_select_page',
-                focus_args = {snap_to = true, nav = 'wide'},
-                current_option = WAR.ICON_SELECT.viewing_type,
-                colour = G.C.RED,
-                no_pips = true,
-                _category = "icon_type"
-            })
+            (function()
+                WAR.ICON_SELECT.type_cycle_args = {
+                    options = WAR.ICON_SELECT.config.page_options,
+                    w = 4.5,
+                    cycle_shoulders = true,
+                    opt_callback = 'war_icon_select_page',
+                    focus_args = {snap_to = true, nav = 'wide'},
+                    current_option = WAR.ICON_SELECT.config.viewing_type,
+                    colour = G.C.RED,
+                    no_pips = true,
+                    _category = "icon_type"
+                }
+                return create_option_cycle(WAR.ICON_SELECT.type_cycle_args)
+            end)()
         }
     }
 
@@ -461,18 +470,23 @@ function G.FUNCS.war_open_icon_select()
         n = G.UIT.R,
         config = { minh = 0.5, minw = 9.6, r = 0.1, paddingg = 0.1, colour = G.C.BLACK, align = "cm" },
         nodes = {
-            create_custom_option_cycle({
-                options = current_page_options,
-                w = 4.5,
-                cycle_shoulders = true,
-                opt_callback = 'war_icon_select_page',
-                focus_args = {snap_to = true, nav = 'wide'},
-                current_option = WAR.ICON_SELECT.icon_page,
-                colour = G.C.RED,
-                no_pips = true,
-                ref_table = WAR.ICON_SELECT, ref_value = "page_text",
-                _category = "icon_page"
-            })
+            (function()
+                -- Store args by reference so war_icon_select_page can update the
+                -- option count and current_option live when the tab changes.
+                WAR.ICON_SELECT.page_cycle_args = {
+                    options = current_page_options,
+                    w = 4.5,
+                    cycle_shoulders = true,
+                    opt_callback = 'war_icon_select_page',
+                    focus_args = {snap_to = true, nav = 'wide'},
+                    current_option = WAR.ICON_SELECT.config.icon_page,
+                    colour = G.C.RED,
+                    no_pips = true,
+                    ref_table = WAR.ICON_SELECT, ref_value = "page_text",
+                    _category = "icon_page"
+                }
+                return create_custom_option_cycle(WAR.ICON_SELECT.page_cycle_args)
+            end)()
         }
     }
 
@@ -491,11 +505,13 @@ function G.FUNCS.war_open_icon_select()
         config = { minw = 12, minh = 9, r = 0.1, padding = 0.1, colour = G.C.CLEAR, align = "cm" },
         nodes = {
             create_UIBox_generic_options({
-                contents = { ui_definition }
+                contents  = { ui_definition },
+                back_func = 'war_icon_select_close',
             })
         }
     };
 
+    WAR.ICON_SELECT.screen_open = true
     G.FUNCS.war_icon_select_page()
     G.FUNCS.war_refresh_selected_icon_card()
 
@@ -507,6 +523,13 @@ function G.FUNCS.war_refresh_selected_icon_card()
     if #WAR.ICON_SELECT.your_icon.cards == 0 then
         local dummy_selected = WAR.UI.create_dummy_icon_card(nil, WAR.ICON_SELECT.your_icon, false, false, 1.6)
         WAR.ICON_SELECT.your_icon:emplace(dummy_selected)
+        -- Clicking the preview card jumps the right panel to the icon's category and page.
+        local card = WAR.ICON_SELECT.your_icon.cards[1]
+        local _prev_click = card.click
+        card.click = function(self)
+            _prev_click(self)
+            G.FUNCS.war_jump_to_current_icon()
+        end
     end
     
     local dummy_sprite = WAR.UI.create_dummy_avatar(nil, false, WAR.ICON_SELECT.your_icon.T.x, WAR.ICON_SELECT.your_icon.T.y, 1.6);
@@ -527,12 +550,30 @@ function G.FUNCS.war_icon_select_page(args)
         if args.cycle_config._category == "icon_type" then
             WAR.ICON_SELECT.config.viewing_type = args.cycle_config.current_option
             WAR.ICON_SELECT.config.icon_page = 1
+            -- Recompute and push updated page options into the stored cycle args so
+            -- the page cycle reflects the new tab's actual page count, and reset its
+            -- position to 1 so the next ">" correctly goes to page 2.
+            if WAR.ICON_SELECT.page_cycle_args then
+                local new_type  = string.lower(WAR.ICON_SELECT.config.page_options[WAR.ICON_SELECT.config.viewing_type])
+                local list      = WAR.ICON_SELECT.icon_cache[new_type]
+                local page_size = WAR.ICON_SELECT.rows * WAR.ICON_SELECT.columns
+                local new_limit = math.max(1, math.ceil((list and #list or 0) / page_size))
+                local new_opts  = {}
+                for i = 1, new_limit do
+                    new_opts[i] = localize("war_page") .. " " .. i
+                end
+                local pa = WAR.ICON_SELECT.page_cycle_args
+                pa.options             = new_opts
+                pa.current_option      = 1
+                pa.current_option_val  = new_opts[1]
+                WAR.ICON_SELECT.page_total = new_limit
+            end
         elseif args.cycle_config._category == "icon_page" then
             WAR.ICON_SELECT.config.icon_page = args.cycle_config.current_option
         end
     end
 
-    WAR.ICON_SELECT.page_text = localize("war_page") .. " ".. WAR.ICON_SELECT.config.icon_page
+    WAR.ICON_SELECT.page_text = WAR.ICON_SELECT.config.icon_page .. "/" .. (WAR.ICON_SELECT.page_total or 1)
 
     -- Empty collection
     for j = 1, #G.your_collection do
@@ -549,9 +590,9 @@ function G.FUNCS.war_icon_select_page(args)
     local page_id = WAR.ICON_SELECT.config.icon_page
     local page_size = WAR.ICON_SELECT.rows * WAR.ICON_SELECT.columns
     if not current_icons then return end
-    for i = (page_id-1)*page_size + 1, (page_id*page_size) + 1 do
+    for i = (page_id-1)*page_size + 1, page_id*page_size do
         if current_icons[i] then
-            local normalized_id = i - (24*(page_id-1))
+            local normalized_id = i - (page_size*(page_id-1))
             local to_area = math.ceil(normalized_id / 6)
             if G.your_collection[to_area] then
                 local dummy_icon = WAR.UI.create_dummy_icon_card(current_icons[i].key, G.your_collection[to_area], true, true)
@@ -567,5 +608,145 @@ function G.FUNCS.war_icon_select_page(args)
         area.width = #area.cards * 1.55
     end
 
-    print(#WAR.ICON_SELECT.your_icon.cards)
+    WAR.log(#WAR.ICON_SELECT.your_icon.cards)
+end
+
+-- Jump the icon grid to the category and page that contains WAR.AVATAR.selected.
+-- Called when the player clicks their current icon preview in the left panel.
+function G.FUNCS.war_jump_to_current_icon()
+    local selected = WAR.AVATAR.selected
+    if not selected then return end
+    local icon_data = WAR.ICONS_BY_KEY and WAR.ICONS_BY_KEY[selected]
+    if not icon_data then return end
+
+    -- Derive kind the same way WAR.AVATAR.by_kind does.
+    local kind = icon_data.special and "special" or (icon_data.achieve and "achievement" or "free")
+
+    -- Map kind name to tab index (page_options = {"Free", "Special", "Achievement"}).
+    local tab_index = nil
+    for i, name in ipairs(WAR.ICON_SELECT.config.page_options) do
+        if string.lower(name) == kind then tab_index = i; break end
+    end
+    if not tab_index then return end
+
+    -- Find the icon's position in its cache list.
+    local list = WAR.ICON_SELECT.icon_cache[kind]
+    if not list then return end
+    local pos = nil
+    for i, icon in ipairs(list) do
+        if icon.key == selected then pos = i; break end
+    end
+    if not pos then return end
+
+    local page_size  = WAR.ICON_SELECT.rows * WAR.ICON_SELECT.columns
+    local page       = math.ceil(pos / page_size)
+    local page_count = math.max(1, math.ceil(#list / page_size))
+
+    -- Commit to config.
+    WAR.ICON_SELECT.config.viewing_type = tab_index
+    WAR.ICON_SELECT.config.icon_page    = page
+    WAR.ICON_SELECT.page_total          = page_count
+
+    -- Update the type cycle widget so it shows the correct category.
+    if WAR.ICON_SELECT.type_cycle_args then
+        local ta = WAR.ICON_SELECT.type_cycle_args
+        ta.current_option     = tab_index
+        ta.current_option_val = ta.options[tab_index]
+    end
+
+    -- Update the page cycle widget with the correct page count and position.
+    if WAR.ICON_SELECT.page_cycle_args then
+        local new_opts = {}
+        for i = 1, page_count do
+            new_opts[i] = localize("war_page") .. " " .. i
+        end
+        local pa = WAR.ICON_SELECT.page_cycle_args
+        pa.options            = new_opts
+        pa.current_option     = page
+        pa.current_option_val = new_opts[page]
+    end
+
+    G.FUNCS.war_icon_select_page()
+end
+
+-- Back handler: clears the screen_open flag then returns to the config tab.
+function G.FUNCS.war_icon_select_close(e)
+    WAR.ICON_SELECT.screen_open = false
+    G.FUNCS.war_back_to_config(e)
+end
+
+-- Rebuild the icon cache and, if the icon select screen is currently open,
+-- refresh all live widgets in place.  Call this whenever entitlements change:
+-- login, logout, achievement unlocked, game over.
+function WAR.ICON_SELECT.refresh()
+    if not WAR.ICON_SELECT.screen_open then return end
+
+    local free_list    = WAR.AVATAR.by_kind("free")
+    local ach_list     = WAR.AVATAR.by_kind("achievement")
+    local special_list = {}
+    for _, icon in ipairs(WAR.AVATAR.by_kind("special")) do
+        if WAR.AVATAR.is_entitled(icon.key) then
+            special_list[#special_list+1] = icon
+        end
+    end
+
+    WAR.ICON_SELECT.icon_cache.free        = free_list
+    WAR.ICON_SELECT.icon_cache.achievement = ach_list
+    WAR.ICON_SELECT.icon_cache.special     = special_list
+
+    -- Rebuild tab list (Special hidden when empty).
+    local page_options = { "Free" }
+    if #special_list > 0 then
+        page_options[#page_options+1] = "Special"
+    end
+    page_options[#page_options+1] = "Achievement"
+
+    -- Preserve the current tab if it still exists; fall back to Free.
+    local old_name = string.lower(
+        (WAR.ICON_SELECT.config.page_options or {})[WAR.ICON_SELECT.config.viewing_type or 1] or "free"
+    )
+    WAR.ICON_SELECT.config.page_options = page_options
+
+    local new_viewing = 1
+    for i, name in ipairs(page_options) do
+        if string.lower(name) == old_name then new_viewing = i; break end
+    end
+    WAR.ICON_SELECT.config.viewing_type = new_viewing
+    WAR.ICON_SELECT.config.icon_page    = 1
+
+    -- Update type cycle widget.
+    if WAR.ICON_SELECT.type_cycle_args then
+        local ta = WAR.ICON_SELECT.type_cycle_args
+        ta.options            = page_options
+        ta.current_option     = new_viewing
+        ta.current_option_val = page_options[new_viewing]
+    end
+
+    -- Recompute page cycle for the (possibly changed) current tab.
+    if WAR.ICON_SELECT.page_cycle_args then
+        local cur_type  = string.lower(page_options[new_viewing])
+        local list      = WAR.ICON_SELECT.icon_cache[cur_type]
+        local page_size = WAR.ICON_SELECT.rows * WAR.ICON_SELECT.columns
+        local new_limit = math.max(1, math.ceil((list and #list or 0) / page_size))
+        local new_opts  = {}
+        for i = 1, new_limit do
+            new_opts[i] = localize("war_page") .. " " .. i
+        end
+        local pa = WAR.ICON_SELECT.page_cycle_args
+        pa.options            = new_opts
+        pa.current_option     = 1
+        pa.current_option_val = new_opts[1]
+        WAR.ICON_SELECT.page_total = new_limit
+    end
+
+    -- Repopulate the grid.
+    G.FUNCS.war_icon_select_page()
+
+    -- If the selected icon was revoked, fall back to default.
+    if not WAR.AVATAR.is_entitled(WAR.AVATAR.selected) then
+        WAR.AVATAR.save_choice(WAR.AVATAR.DEFAULT)
+    end
+    if WAR.ICON_SELECT.your_icon and #WAR.ICON_SELECT.your_icon.cards > 0 then
+        G.FUNCS.war_refresh_selected_icon_card()
+    end
 end

@@ -55,6 +55,7 @@ WAR.ICONS = {
     { key = "rodeo_abandoned_by_god", atlas = "war_icons_free",   row = 40 },
     { key = "three_cheers_one",atlas = "war_icons_free",         row = 41 },
     { key = "three_cheers_two",atlas = "war_icons_free",         row = 42 },
+    { key = "printer",         atlas = "war_icons_free",         row = 43 },
     { key = "jolly",           atlas = "war_icons_achievement",  row = 0,  achieve = function(self, args) if args.type == 'war_win' then return WAR.GAME.jolly_valid end end },
     { key = "oops",            atlas = "war_icons_achievement",  row = 1,  achieve = function(self, args) if args.type == 'war_oops' then return true end end },
     { key = "droll",           atlas = "war_icons_achievement",  row = 2,  achieve = function(self, args) if args.type == 'war_win' then return WAR.GAME.droll_valid end end },
@@ -131,6 +132,8 @@ WAR.ICONS = {
     { key = "fir",             atlas = "war_icons_special",      row = 17, special = true },
     { key = "belenos_bear",    atlas = "war_icons_special",      row = 18, special = true },
     { key = "vagabond",        atlas = "war_icons_special",      row = 19, special = true },
+    { key = "the_unseen_explosion", atlas = "war_icons_special", row = 20, special = true },
+    { key = "roffle",          atlas = "war_icons_special",      row = 21, special = true },
 }
 
 WAR.AVATAR.DEFAULT  = "jimbo"

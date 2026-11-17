@@ -29,6 +29,7 @@ FREE_ICONS = {
     'fibonacci', 'scholar', 'ride_the_bus', 'pareidolia', 'brutalists_heart',
     'chud', 'sob', 'tasque_manager',
     'mizzle', 'ironclad', 'rodeo_abandoned_by_god', 'three_cheers_one', 'three_cheers_two',
+    'printer',
 }
 
 SPECIAL_ICONS = {
@@ -36,6 +37,7 @@ SPECIAL_ICONS = {
     'sheila', 'astra', 'lizie', 'inky', 'revo', 'argel', 'baggute',
     'amolyte', 'gabby', 'willow',
     'george_the_rat', 'fir', 'belenos_bear', 'vagabond',
+    'the_unseen_explosion', 'roffle',
 }
 
 def _ach(threshold=None, stat=None, reserved=False):
@@ -399,6 +401,8 @@ def new_game_state():
         'guest_lives':             4,
         'host_score':              0.0,
         'guest_score':             0.0,
+        'host_log_score':          0.0,
+        'guest_log_score':         0.0,
         'host_hands_left':         4,
         'guest_hands_left':        4,
         'host_ready_blind':        False,
@@ -783,6 +787,8 @@ async def reset_per_blind(lobby):
     lobby['guest_timer_lives_blocker'] = False
     lobby['host_score']              = 0.0
     lobby['guest_score']             = 0.0
+    lobby['host_log_score']          = 0.0
+    lobby['guest_log_score']         = 0.0
     lobby['host_hands_left']         = 4
     lobby['guest_hands_left']        = 4
     lobby['_in_pvp_blind']           = False
@@ -996,6 +1002,20 @@ async def handle_play_hand(lobby, role, msg):
         lobby[f'_{role}_best'] = score
     lobby[f'{role}_hands_left'] = hands_left
 
+    # log_score: log10 of the actual score, sent by the client so that BigNum
+    # scores beyond float64 (Amulet 10^800 etc.) compare correctly.
+    # Old clients omit it; derive from the capped score as a safe fallback.
+    raw_log = msg.get('log_score')
+    if raw_log is not None:
+        try:
+            ls = float(raw_log)
+            log_score = ls if math.isfinite(ls) else (math.log10(score) if score > 0 else -1.0)
+        except (TypeError, ValueError):
+            log_score = math.log10(score) if score > 0 else -1.0
+    else:
+        log_score = math.log10(score) if score > 0 else -1.0
+    lobby[f'{role}_log_score'] = log_score
+
     played_real = score > 0
     if played_real:
         lobby[f'{role}_played_this_blind'] = True
@@ -1035,12 +1055,12 @@ async def handle_play_hand(lobby, role, msg):
 
     h = lobby['host_hands_left']
     g = lobby['guest_hands_left']
-    hs = lobby['host_score']
-    gs = lobby['guest_score']
+    hls = lobby['host_log_score']
+    gls = lobby['guest_log_score']
 
     ends = (
-        (g < 1 and gs < hs) or
-        (h < 1 and hs < gs) or
+        (g < 1 and gls < hls) or
+        (h < 1 and hls < gls) or
         (h < 1 and g < 1)
     )
     if ends:
@@ -1080,18 +1100,20 @@ def _make_gameover_msgs(lobby, winner_role, score_results):
 
 async def resolve_pvp(lobby):
     lobby['_in_pvp_blind'] = False
-    hs = lobby['host_score']
-    gs = lobby['guest_score']
+    hs  = lobby['host_score']
+    gs  = lobby['guest_score']
+    hls = lobby['host_log_score']
+    gls = lobby['guest_log_score']
     host_w  = lobby['host']
     guest_w = lobby['guest']
 
-    if hs == gs:
+    if hls == gls:
         # Draw — no life lost
         await reset_per_blind(lobby)
         await broadcast(lobby, {'action': 'endPvP', 'lost': False})
         return
 
-    winner_role = 'host' if hs > gs else 'guest'
+    winner_role = 'host' if hls > gls else 'guest'
     loser_role  = get_enemy_role(winner_role)
 
     await lose_life(lobby, loser_role, 'round')
@@ -1114,7 +1136,7 @@ async def resolve_pvp(lobby):
     if guest_w:
         await send(guest_w, {'action': 'endPvP', 'lost': winner_role == 'host'})
 
-    log.info(f"lobby {lobby['_code']} endPvP winner={winner_role} h={hs} g={gs}")
+    log.info(f"lobby {lobby['_code']} endPvP winner={winner_role} h={hs}(log={hls:.3g}) g={gs}(log={gls:.3g})")
 
 async def handle_lobby_ready(writer, msg, lobby, role):
     is_ready = msg.get('action') == 'ready'

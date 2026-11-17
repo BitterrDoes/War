@@ -132,9 +132,14 @@ function WAR.AUTH.clear_session()
     WAR.AUTH.user   = nil
     WAR.AUTH.token  = nil
     WAR.AUTH.state  = "idle"
-    
+    WAR.AVATAR.entitlements = {}
     WAR.AVATAR.selected = WAR.AVATAR.DEFAULT
     WAR.config.icon = WAR.AVATAR.selected
+    -- Reset displayed stats so the previous account's numbers don't persist.
+    WAR.AUTH.stats.wins        = "-"
+    WAR.AUTH.stats.losses      = "-"
+    WAR.AUTH.stats.win_percent = "-%"
+    if WAR.ICON_SELECT and WAR.ICON_SELECT.refresh then WAR.ICON_SELECT.refresh() end
 end
 
 function WAR.AUTH.handle(msg)
@@ -186,6 +191,7 @@ function WAR.AUTH.handle(msg)
         end
         if WAR.AUTH._pending_new_login then WAR.AUTH.newly_logged_in = true; WAR.AUTH._pending_new_login = false end
         if WAR.AUTH.on_done then WAR.AUTH.on_done(true, nil) end
+        if WAR.ICON_SELECT and WAR.ICON_SELECT.refresh then WAR.ICON_SELECT.refresh() end
 
     elseif a == "logged_out" then
         WAR.AUTH.clear_session()
