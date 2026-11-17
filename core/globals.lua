@@ -434,10 +434,10 @@ SMODS.Atlas({ key="war_socials", path="mod_socials.png", px=25, py=28 })
 -- texture_scaling 2 it otherwise builds a 2x canvas through a smooth shader,
 -- which is what turned every icon soft. Nearest sampling keeps the 34px art
 -- as hard pixels at whatever the UI draws them at.
-SMODS.Atlas({ key="war_icons_free",        path="icons_free.png",        px=34, py=34, atlas_table="ANIMATION_ATLAS", frames=21, force_pixel=true })
-SMODS.Atlas({ key="war_icons_achievement", path="icons_achievement.png", px=34, py=34, atlas_table="ANIMATION_ATLAS", frames=21, force_pixel=true })
-SMODS.Atlas({ key="war_icons_special",     path="icons_special.png",     px=34, py=34, atlas_table="ANIMATION_ATLAS", frames=21, force_pixel=true })
-SMODS.Atlas({ key="war_icons_locked",      path="locked_icon.png",       px=34, py=34, atlas_table="ANIMATION_ATLAS", frames=21, force_pixel=true })
+SMODS.Atlas({ key="war_icons_free",        path="icons_free.png",        px=34, py=34, atlas_table="ANIMATION_ATLAS", frames=21, force_pixel=false })
+SMODS.Atlas({ key="war_icons_achievement", path="icons_achievement.png", px=34, py=34, atlas_table="ANIMATION_ATLAS", frames=21, force_pixel=false })
+SMODS.Atlas({ key="war_icons_special",     path="icons_special.png",     px=34, py=34, atlas_table="ANIMATION_ATLAS", frames=21, force_pixel=false })
+SMODS.Atlas({ key="war_icons_locked",      path="locked_icon.png",       px=34, py=34, atlas_table="ANIMATION_ATLAS", frames=21, force_pixel=false })
 
 -- Full IEEE 754 double precision for wire transmission: any score Balatro can
 -- produce (up to ~1.8e308) survives the JSON round-trip without loss of
