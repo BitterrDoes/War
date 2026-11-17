@@ -360,6 +360,8 @@ return {
             war_win_percent           = "Win %",
             war_click_to              = "Click to",
             war_customize             = "Customize",
+            war_page                  = "Page", -- dont ask
+            war_current_icon          = "Current Icon:",
 
             -- Mod config screens
             war_icon                  = "Icon",

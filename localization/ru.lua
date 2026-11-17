@@ -184,6 +184,7 @@ return {
             war_rs_weeworld_desc   = {
                 "Убирает большинство Джокеров,",
                 "Расходников, Бустерных Наборов и Тэгов"
+            },
 
             -- Ruleset: Packaged
             war_rs_packaged_name   = "Упакованный",
