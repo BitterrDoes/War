@@ -424,10 +424,12 @@ local function war_opts_gameplay_content()
     if cfg.death_on_round_loss    == nil then cfg.death_on_round_loss    = true  end
     if cfg.hide_score_until_played == nil then cfg.hide_score_until_played = false end
     if cfg.comeback_gold           == nil then cfg.comeback_gold           = true  end
+    if cfg.pvp_boss_effects        == nil then cfg.pvp_boss_effects        = true  end
     local nodes = {
         war_toggle(localize('war_opt_death_round'),   "death_on_round_loss"),
         war_toggle(localize('war_opt_hide_score'),    "hide_score_until_played"),
         war_toggle(localize('war_opt_comeback_gold'), "comeback_gold"),
+        war_toggle(localize('war_opt_boss_effects'),  "pvp_boss_effects"),
     }
     return { n=G.UIT.ROOT, config={
         emboss=0.05, minh=4, r=0.1, minw=10,

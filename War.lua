@@ -62,6 +62,7 @@ WAR.load("ui/_init.lua")
 WAR.load("ui/utils.lua")
 WAR.load("ui/home.lua")
 WAR.load("ui/account.lua")
+WAR.load("ui/config.lua")
 WAR.load("ui/screens.lua")
 WAR.load("ui/icon_select.lua")
 WAR.load("ui/hud.lua")
@@ -69,8 +70,9 @@ WAR.load("ui/popups.lua")
 WAR.load("ui/lobby.lua")
 
 -- TEMPORARY
-WAR.load("ui/temp/avatar.lua")
-WAR.load("ui/temp/account.lua")
-WAR.load("ui/temp/config.lua")
+-- WAR.load("ui/temp/avatar.lua") -- merged into ui/icon_select.lua
+WAR.load("ui/temp/account.lua") -- Still working on account pages, then will move to ui/account.lua
+-- WAR.load("ui/temp/config.lua") -- moved to ui/config.lua (permanent change)
+-- WAR.load("ui/temp/icon_select.lua")
 
 WAR.load_dir("compat")

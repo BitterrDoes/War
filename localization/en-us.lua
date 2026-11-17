@@ -61,6 +61,7 @@ return {
             war_icon_rodeo_abandoned_by_god = { name = "Rodeo Abandoned by God" },
             war_icon_three_cheers_one = { name = "Three Cheers (One)" },
             war_icon_three_cheers_two = { name = "Three Cheers (Two)" },
+            war_icon_printer          = { name = "Printer" },
 
             -- Achievement
             war_icon_jolly            = { name = "Jolly", text = { "Win a game playing only hands that contain a pair" } }, -- in vanilla this is Pair, Two Pair, Three of a Kind, Full House, Four of a Kind, Five of a Kind, Flush House, Flush Five and sometimes Flush
@@ -141,6 +142,8 @@ return {
             war_icon_fir              = { name = "Fir" },
             war_icon_belenos_bear     = { name = "Belenos Bear" },
             war_icon_vagabond         = { name = "Vagabond" },
+            war_icon_the_unseen_explosion = { name = "TheUnseenExplosion" },
+            war_icon_roffle           = { name = "Roffle" },
         },
         Blind = {},
     },
@@ -375,6 +378,8 @@ return {
             war_win_percent           = "Win %",
             war_click_to              = "Click to",
             war_customize             = "Customize",
+            war_page                  = "Page", -- dont ask
+            war_current_icon          = "Current Icon:",
 
             -- Mod config screens
             war_icon                  = "Icon",

@@ -434,10 +434,10 @@ SMODS.Atlas({ key="war_socials", path="mod_socials.png", px=25, py=28 })
 -- texture_scaling 2 it otherwise builds a 2x canvas through a smooth shader,
 -- which is what turned every icon soft. Nearest sampling keeps the 34px art
 -- as hard pixels at whatever the UI draws them at.
-SMODS.Atlas({ key="war_icons_free",        path="icons_free.png",        px=34, py=34, atlas_table="ANIMATION_ATLAS", frames=21, force_pixel=true })
-SMODS.Atlas({ key="war_icons_achievement", path="icons_achievement.png", px=34, py=34, atlas_table="ANIMATION_ATLAS", frames=21, force_pixel=true })
-SMODS.Atlas({ key="war_icons_special",     path="icons_special.png",     px=34, py=34, atlas_table="ANIMATION_ATLAS", frames=21, force_pixel=true })
-SMODS.Atlas({ key="war_icons_locked",      path="locked_icon.png",       px=34, py=34, atlas_table="ANIMATION_ATLAS", frames=21, force_pixel=true })
+SMODS.Atlas({ key="war_icons_free",        path="icons_free.png",        px=34, py=34, atlas_table="ANIMATION_ATLAS", frames=21, force_pixel=false })
+SMODS.Atlas({ key="war_icons_achievement", path="icons_achievement.png", px=34, py=34, atlas_table="ANIMATION_ATLAS", frames=21, force_pixel=false })
+SMODS.Atlas({ key="war_icons_special",     path="icons_special.png",     px=34, py=34, atlas_table="ANIMATION_ATLAS", frames=21, force_pixel=false })
+SMODS.Atlas({ key="war_icons_locked",      path="locked_icon.png",       px=34, py=34, atlas_table="ANIMATION_ATLAS", frames=21, force_pixel=false })
 
 -- Full IEEE 754 double precision for wire transmission: any score Balatro can
 -- produce (up to ~1.8e308) survives the JSON round-trip without loss of
@@ -449,8 +449,7 @@ WAR.SCORE = {}
 
 function WAR.SCORE.encode(n)
     if type(n) == "table" then
-        -- Amulet BigNum stores the float in .number; generic SMODS to_big fallback
-        -- reads tostring and strips formatting characters.
+        -- Amulet BigNum (Lua-table form, e.g. enable_compat=true) or other mod BigNum.
         if type(n.number) == "number" then
             n = n.number
         elseif type(n.to_number) == "function" then
@@ -458,13 +457,64 @@ function WAR.SCORE.encode(n)
         else
             n = tonumber((tostring(n):gsub(",", ""):gsub("%s", ""))) or 0
         end
+    elseif type(n) ~= "number" then
+        -- FFI cdata BigNum (Amulet OmegaNum with enable_compat=false, type()=="cdata").
+        local ok, v = pcall(function() return n.number end)
+        if ok and type(v) == "number" then
+            n = v
+        else
+            n = tonumber((tostring(n):gsub(",", ""):gsub("%s", ""))) or 0
+        end
     end
     n = tonumber(n) or 0
+    -- Guard NaN and infinity: relay uses Python float comparisons and can't handle them.
+    if n ~= n then n = 0 end           -- NaN → 0
+    if n >  1e300 then n =  1e300 end  -- +Inf/overflow → large finite sentinel
+    if n < -1e300 then n = -1e300 end  -- -Inf → large negative sentinel
     return string.format("%.17g", n)
 end
 
 function WAR.SCORE.decode(s)
     return tonumber(s) or 0
+end
+
+-- Compute the log10 of a score value (plain number or BigNum) as a Lua number.
+-- Never returns NaN or ±inf: non-positive values map to -1e300 (always loses),
+-- and unrepresentably huge values map to 1e300 (always wins).
+-- This is sent alongside the raw score so the relay can compare scores that
+-- overflow float64 (Amulet OmegaNum scores like 10^800) correctly.
+function WAR.SCORE.log10_of(raw)
+    if raw == nil then return -1e300 end
+    local n = tonumber(raw)
+    if n then
+        if n <= 0 or n ~= n then return -1e300 end
+        if n >= math.huge then return 1e300 end
+        return math.log10(n)
+    end
+    -- BigNum (table or FFI cdata): try .number first (works when score < 1e308).
+    local ok, num = pcall(function() return raw.number end)
+    if ok and type(num) == "number" and num == num then
+        if num > 0 and num < math.huge then return math.log10(num) end
+        if num <= 0 then return -1e300 end
+        -- .number overflowed (score > 1e308): use OmegaNum's log10() method,
+        -- which returns a BigNum whose .number IS the exponent (e.g. 800 for 10^800).
+        ok, num = pcall(function()
+            local lg = raw:log10()
+            local ok2, v = pcall(function() return lg.number end)
+            if ok2 and type(v) == "number" and v == v and v < math.huge then return v end
+            local ok3, v2 = pcall(function() return lg:to_number() end)
+            if ok3 and type(v2) == "number" and v2 == v2 and v2 < math.huge then return v2 end
+            return nil
+        end)
+        if ok and type(num) == "number" and num == num then
+            return math.min(num, 1e300)
+        end
+        return 1e300  -- tower-tier number; wins every comparison
+    end
+    -- Tostring fallback (may lose precision for large notation strings).
+    local parsed = tonumber((tostring(raw):gsub(",", ""):gsub("%s", "")))
+    if parsed and parsed > 0 then return math.log10(parsed) end
+    return -1e300
 end
 
 -- Display a score using Balatro's own formatter where available.

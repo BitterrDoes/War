@@ -247,12 +247,14 @@ function WAR.SYNC.tick()
                 if fresh and WAR.AVATAR.icon(key) then
                     notify_alert(key, 'war_icon')
                 end
+                if WAR.ICON_SELECT and WAR.ICON_SELECT.refresh then WAR.ICON_SELECT.refresh() end
             end
 
         elseif a == "entitlementGranted" then
             local key = m.key
             if key then
                 WAR.AVATAR.grant_local(key)
+                if WAR.ICON_SELECT and WAR.ICON_SELECT.refresh then WAR.ICON_SELECT.refresh() end
             end
 
         elseif a == "counters" then
@@ -497,6 +499,7 @@ function WAR.SYNC.on_game_over(i_won)
     else
         show()
     end
+    if WAR.ICON_SELECT and WAR.ICON_SELECT.refresh then WAR.ICON_SELECT.refresh() end
 end
 
 function WAR.SYNC.on_stop_game(msg)
